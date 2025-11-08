@@ -32,8 +32,7 @@ const manifest = {
           name: 'skip',
           isRequired: false
         }
-      ],
-      pageSize: 50
+      ]
     }
   ],
   idPrefixes: ['tt', 'ml']
@@ -46,6 +45,7 @@ const builder = new addonBuilder(manifest);
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
   const skip = parseInt(extra?.skip || 0);
+  const PAGE_SIZE = 100; // Stremio's default catalog page size
   console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
@@ -57,15 +57,15 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   if (catalogCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
     console.log(`Returning cached catalog (${catalogCache.length} total items, skip=${skip})`);
     // Return paginated slice from cache
-    const paginatedMetas = catalogCache.slice(skip, skip + 50);
+    const paginatedMetas = catalogCache.slice(skip, skip + PAGE_SIZE);
     console.log(`Returning ${paginatedMetas.length} items from position ${skip}`);
     return { metas: paginatedMetas };
   }
 
   console.log('Fetching fresh data from Reddit...');
   
-  // Fetch movies from Reddit (get as many as possible for pagination)
-  const movies = await fetchMovieLeaks(200);
+  // Fetch movies from Reddit (RSS typically returns ~100 items max)
+  const movies = await fetchMovieLeaks(100);
   
   // Remove duplicates based on IMDb ID or slug
   const uniqueMovies = [];
@@ -141,18 +141,9 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   console.log(`Catalog updated with ${metas.length} movies total`);
   
   // Return paginated slice
-  const paginatedMetas = metas.slice(skip, skip + 50);
+  const paginatedMetas = metas.slice(skip, skip + PAGE_SIZE);
   
-  // If we have items but less than 50, and there might be confusion,
-  // Stremio expects exactly 50 items per page or it stops pagination
-  // So we only return results if we have them
   console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, totalAvailable=${metas.length}`);
-  
-  // Important: Return empty array if skip is beyond available items
-  if (skip >= metas.length) {
-    console.log('No more items available');
-    return { metas: [] };
-  }
   
   return { metas: paginatedMetas };
 });
