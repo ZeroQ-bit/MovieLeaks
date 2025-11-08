@@ -18,7 +18,7 @@ const manifest = {
   id: 'com.movieleaks.stremio',
   version: '1.0.0',
   name: 'Movie Leaks Catalog',
-  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit',
+  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n☕ Support: https://ko-fi.com/zeroq',
   logo: 'https://styles.redditmedia.com/t5_2z0gz/styles/communityIcon_xqq9r4hqnl6b1.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
@@ -39,13 +39,6 @@ const manifest = {
     configurable: false,
     configurationRequired: false
   },
-  links: [
-    {
-      name: 'Buy Me Coffee',
-      category: 'support',
-      url: 'https://ko-fi.com/zeroq'
-    }
-  ],
   idPrefixes: ['tt', 'ml']
 };
 
