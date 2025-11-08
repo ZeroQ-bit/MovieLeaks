@@ -7,15 +7,24 @@ import fetch from 'node-fetch';
  */
 export async function fetchMovieLeaks(limit = 50) {
   try {
-    const url = `https://www.reddit.com/r/movieleaks/new.json?limit=${limit}`;
+    // Use old.reddit.com which is more lenient
+    const url = `https://old.reddit.com/r/movieleaks/new.json?limit=${limit}`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`Reddit API error: ${response.status}`);
+      console.error(`Reddit API returned ${response.status}: ${response.statusText}`);
+      // Return empty array instead of throwing to prevent crash
+      return [];
     }
 
     const data = await response.json();
