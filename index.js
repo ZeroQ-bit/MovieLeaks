@@ -26,13 +26,7 @@ const manifest = {
     {
       type: 'movie',
       id: 'movieleaks',
-      name: 'Movie Leaks',
-      extra: [
-        {
-          name: 'skip',
-          isRequired: false
-        }
-      ]
+      name: 'Movie Leaks'
     }
   ],
   idPrefixes: ['tt', 'ml']
@@ -44,7 +38,14 @@ const builder = new addonBuilder(manifest);
  * Catalog handler - returns list of movies from r/movieleaks
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${extra?.skip || 0}`);
+  
   if (type !== 'movie' || id !== 'movieleaks') {
+    return { metas: [] };
+  }
+  
+  // Ignore pagination - always return full catalog
+  if (extra?.skip && extra.skip > 0) {
     return { metas: [] };
   }
 
