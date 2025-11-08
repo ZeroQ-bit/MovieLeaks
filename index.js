@@ -1,6 +1,9 @@
 import { addonBuilder } from 'stremio-addon-sdk';
+import addonSDK from 'stremio-addon-sdk';
 import { fetchMovieLeaks } from './reddit.js';
 import { getMovieByImdbId } from './cinemeta.js';
+
+const { serveHTTP } = addonSDK;
 
 // Configuration
 const PORT = process.env.PORT || 7000;
@@ -154,11 +157,12 @@ builder.defineMetaHandler(async ({ type, id }) => {
 });
 
 // Start the addon server
-const addonInterface = builder.getInterface();
-
-addonInterface.listen(PORT, () => {
+serveHTTP(builder.getInterface(), { port: PORT }).then(() => {
   console.log(`🎬 Movie Leaks Stremio Addon running at http://localhost:${PORT}`);
   console.log(`📦 Manifest available at: http://localhost:${PORT}/manifest.json`);
   console.log(`🔧 Metadata provider: Cinemeta (Stremio official)`);
   console.log(`\nTo install in Stremio, add this URL: http://localhost:${PORT}/manifest.json`);
+}).catch(error => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });
