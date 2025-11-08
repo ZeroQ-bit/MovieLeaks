@@ -64,8 +64,8 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
 
   console.log('Fetching fresh data from Reddit...');
   
-  // Fetch movies from Reddit (RSS typically returns ~100 items max)
-  const movies = await fetchMovieLeaks(100);
+  // Fetch movies from Reddit (JSON API supports pagination)
+  const movies = await fetchMovieLeaks(300);
   
   // Remove duplicates based on IMDb ID or slug
   const uniqueMovies = [];
