@@ -9,8 +9,8 @@ import fetch from 'node-fetch';
 export async function fetchMovieLeaks(limit = 100) {
   try {
     // Use Reddit RSS feed - more reliable for server-side scraping
-    // Note: RSS feeds typically max out around 100 items
-    const url = `https://www.reddit.com/r/movieleaks/new/.rss?limit=${Math.min(limit, 100)}`;
+    // Note: RSS feeds typically max out around 100 items regardless of limit
+    const url = `https://www.reddit.com/r/movieleaks/new/.rss?limit=100`;
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

@@ -137,10 +137,11 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   catalogCache = metas;
   cacheTimestamp = now;
 
-  console.log(`Catalog updated with ${metas.length} movies`);
+  console.log(`Catalog updated with ${metas.length} movies total`);
   
   // Return paginated slice
   const paginatedMetas = metas.slice(skip, skip + 50);
+  console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, hasMore=${skip + 50 < metas.length}`);
   return { metas: paginatedMetas };
 });
 
