@@ -79,12 +79,22 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   console.log(`Fetched ${movies.length} posts, ${uniqueMovies.length} unique movies`);
   
   // Enrich with Cinemeta metadata
-  const metas = await Promise.all(uniqueMovies.map(async (movie) => {
+  const metas = (await Promise.all(uniqueMovies.map(async (movie) => {
     let cinemataData = null;
 
     // Try to fetch from Cinemeta if we have an IMDb ID
     if (movie.imdbId) {
-      cinemataData = await getMovieByImdbId(movie.imdbId);
+      try {
+        cinemataData = await getMovieByImdbId(movie.imdbId);
+      } catch (error) {
+        console.error(`Failed to fetch Cinemeta data for ${movie.imdbId}:`, error.message);
+      }
+    }
+
+    // Skip movies without IMDb ID and without poster
+    if (!movie.imdbId && !movie.poster && !movie.thumbnail) {
+      console.log(`Skipping movie without IMDb ID or poster: ${movie.title}`);
+      return null;
     }
 
     // Build meta object
@@ -93,7 +103,7 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
       type: 'movie',
       name: cinemataData?.name || movie.title,
       releaseInfo: cinemataData?.releaseInfo || movie.year,
-      poster: cinemataData?.poster || movie.poster || movie.thumbnail,
+      poster: cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster',
       background: cinemataData?.background,
       logo: cinemataData?.logo,
       description: cinemataData?.description || movie.description || `Leaked movie from r/movieleaks\n\nPosted by u/${movie.author} on Reddit.\n\n${movie.redditUrl}`,
@@ -121,7 +131,7 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
     }
 
     return meta;
-  }));
+  }))).filter(meta => meta !== null);
 
   // Update cache
   catalogCache = metas;
