@@ -54,9 +54,10 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   // Check cache
   const now = Date.now();
   if (catalogCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
-    console.log('Returning cached catalog');
+    console.log(`Returning cached catalog (${catalogCache.length} total items, skip=${skip})`);
     // Return paginated slice from cache
     const paginatedMetas = catalogCache.slice(skip, skip + 50);
+    console.log(`Returning ${paginatedMetas.length} items from position ${skip}`);
     return { metas: paginatedMetas };
   }
 
