@@ -60,8 +60,20 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   // Fetch movies from Reddit
   const movies = await fetchMovieLeaks(50);
   
+  // Remove duplicates based on IMDb ID or slug
+  const uniqueMovies = [];
+  const seenIds = new Set();
+  for (const movie of movies) {
+    if (!seenIds.has(movie.id)) {
+      seenIds.add(movie.id);
+      uniqueMovies.push(movie);
+    }
+  }
+  
+  console.log(`Fetched ${movies.length} posts, ${uniqueMovies.length} unique movies`);
+  
   // Enrich with Cinemeta metadata
-  const metas = await Promise.all(movies.map(async (movie) => {
+  const metas = await Promise.all(uniqueMovies.map(async (movie) => {
     let cinemataData = null;
 
     // Try to fetch from Cinemeta if we have an IMDb ID
