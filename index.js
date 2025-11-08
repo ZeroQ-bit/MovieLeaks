@@ -32,7 +32,8 @@ const manifest = {
           name: 'skip',
           isRequired: false
         }
-      ]
+      ],
+      pageSize: 50
     }
   ],
   idPrefixes: ['tt', 'ml']
@@ -141,7 +142,18 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   
   // Return paginated slice
   const paginatedMetas = metas.slice(skip, skip + 50);
-  console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, hasMore=${skip + 50 < metas.length}`);
+  
+  // If we have items but less than 50, and there might be confusion,
+  // Stremio expects exactly 50 items per page or it stops pagination
+  // So we only return results if we have them
+  console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, totalAvailable=${metas.length}`);
+  
+  // Important: Return empty array if skip is beyond available items
+  if (skip >= metas.length) {
+    console.log('No more items available');
+    return { metas: [] };
+  }
+  
   return { metas: paginatedMetas };
 });
 
