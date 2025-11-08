@@ -62,8 +62,8 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
 
   console.log('Fetching fresh data from Reddit...');
   
-  // Fetch movies from Reddit (get more for pagination)
-  const movies = await fetchMovieLeaks(100);
+  // Fetch movies from Reddit (get as many as possible for pagination)
+  const movies = await fetchMovieLeaks(200);
   
   // Remove duplicates based on IMDb ID or slug
   const uniqueMovies = [];
