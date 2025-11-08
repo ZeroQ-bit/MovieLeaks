@@ -26,13 +26,24 @@ const manifest = {
     {
       type: 'movie',
       id: 'movieleaks',
-      name: 'Movie Leaks',
+      name: 'Latest Leaks',
       extra: [
         {
           name: 'skip',
           isRequired: false
         }
       ]
+    }
+  ],
+  behaviorHints: {
+    configurable: false,
+    configurationRequired: false
+  },
+  links: [
+    {
+      name: 'Buy Me Coffee',
+      category: 'support',
+      url: 'https://ko-fi.com/zeroq'
     }
   ],
   idPrefixes: ['tt', 'ml']
