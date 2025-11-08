@@ -26,7 +26,13 @@ const manifest = {
     {
       type: 'movie',
       id: 'movieleaks',
-      name: 'Movie Leaks'
+      name: 'Movie Leaks',
+      extra: [
+        {
+          name: 'skip',
+          isRequired: false
+        }
+      ]
     }
   ],
   idPrefixes: ['tt', 'ml']
@@ -38,14 +44,10 @@ const builder = new addonBuilder(manifest);
  * Catalog handler - returns list of movies from r/movieleaks
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
-  console.log(`Catalog request: type=${type}, id=${id}, skip=${extra?.skip || 0}`);
+  const skip = parseInt(extra?.skip || 0);
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
-    return { metas: [] };
-  }
-  
-  // Ignore pagination - always return full catalog
-  if (extra?.skip && extra.skip > 0) {
     return { metas: [] };
   }
 
@@ -53,13 +55,15 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   const now = Date.now();
   if (catalogCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
     console.log('Returning cached catalog');
-    return { metas: catalogCache };
+    // Return paginated slice from cache
+    const paginatedMetas = catalogCache.slice(skip, skip + 50);
+    return { metas: paginatedMetas };
   }
 
   console.log('Fetching fresh data from Reddit...');
   
-  // Fetch movies from Reddit
-  const movies = await fetchMovieLeaks(50);
+  // Fetch movies from Reddit (get more for pagination)
+  const movies = await fetchMovieLeaks(100);
   
   // Remove duplicates based on IMDb ID or slug
   const uniqueMovies = [];
@@ -123,7 +127,10 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
   cacheTimestamp = now;
 
   console.log(`Catalog updated with ${metas.length} movies`);
-  return { metas };
+  
+  // Return paginated slice
+  const paginatedMetas = metas.slice(skip, skip + 50);
+  return { metas: paginatedMetas };
 });
 
 /**
