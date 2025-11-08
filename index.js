@@ -19,7 +19,7 @@ const manifest = {
   version: '1.0.0',
   name: 'Movie Leaks Catalog',
   description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n☕ Support: https://ko-fi.com/zeroq',
-  logo: 'https://styles.redditmedia.com/t5_2z0gz/styles/communityIcon_xqq9r4hqnl6b1.png',
+  logo: 'https://i.imgur.com/QN9fvjv.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
   catalogs: [
