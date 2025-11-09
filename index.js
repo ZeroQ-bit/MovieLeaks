@@ -215,109 +215,75 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
   const rpdbApiKey = config?.rpdb_api_key || '';
   const mdblistApiKey = config?.mdblist_api_key || '';
   
+  console.log(`Meta request for ${id}, MDBList: ${mdblistApiKey ? 'YES' : 'NO'}, RPDB: ${rpdbApiKey ? 'YES' : 'NO'}`);
+  
   if (type !== 'movie') {
     return { meta: null };
   }
 
+  let meta = null;
+  let mdblistRatings = null;
+
   // Try to find in cache first
-  if (catalogCache && !mdblistApiKey) {
-    // Only use cache if MDBList is not configured, to avoid ratings disappearing
+  if (catalogCache) {
     const cached = catalogCache.find(m => m.id === id);
     if (cached) {
-      // Make a copy to avoid mutating cache
-      const meta = { ...cached };
-      
-      // Apply RPDB poster if configured
-      if (rpdbApiKey && id.startsWith('tt')) {
-        const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
-        if (rpdbPoster) {
-          meta.poster = rpdbPoster;
-        }
-      }
-      
-      return { meta };
-    }
-  }
-  
-  // If MDBList is configured OR not in cache, fetch fresh data
-  if (catalogCache && mdblistApiKey) {
-    const cached = catalogCache.find(m => m.id === id);
-    if (cached && id.startsWith('tt')) {
       // Make a deep copy to avoid mutating cache
-      const meta = JSON.parse(JSON.stringify(cached));
-      
-      // Apply RPDB poster if configured
-      if (rpdbApiKey) {
-        const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
-        if (rpdbPoster) {
-          meta.poster = rpdbPoster;
-        }
-      }
-      
-      // Fetch and add MDBList ratings
-      try {
-        console.log(`Fetching MDBList ratings for cached movie ${id}...`);
-        const mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
-        if (mdblistRatings) {
-          const ratingsText = formatRatingsForDescription(mdblistRatings);
-          meta.description = (meta.description || '') + ratingsText;
-          console.log(`Added ratings to ${id}: ${ratingsText.substring(0, 100)}...`);
-        } else {
-          console.log(`No ratings returned for ${id}`);
-        }
-      } catch (error) {
-        console.error(`Failed to fetch MDBList data for ${id}:`, error.message);
-      }
-      
-      return { meta };
+      meta = JSON.parse(JSON.stringify(cached));
+      console.log(`Found ${id} in cache`);
     }
   }
 
-  // If not in cache, try to fetch from Cinemeta
-  if (id.startsWith('tt')) {
+  // If not in cache and has IMDb ID, fetch from Cinemeta
+  if (!meta && id.startsWith('tt')) {
+    console.log(`Fetching ${id} from Cinemeta...`);
     const cinemataData = await getMovieByImdbId(id);
-    let mdblistRatings = null;
-    
-    // Fetch MDBList ratings if API key is configured
-    if (mdblistApiKey) {
-      try {
-        mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
-      } catch (error) {
-        console.error(`Failed to fetch MDBList data for ${id}:`, error.message);
-      }
-    }
-    
     if (cinemataData) {
-      let description = cinemataData.description;
-      
-      // Add MDBList ratings to description if available
-      if (mdblistRatings) {
-        description += formatRatingsForDescription(mdblistRatings);
-      }
-      
-      return {
-        meta: {
-          id,
-          type: 'movie',
-          name: cinemataData.name,
-          poster: rpdbApiKey 
-            ? (getRPDBPosterUrl(id, rpdbApiKey) || cinemataData.poster)
-            : cinemataData.poster,
-          background: cinemataData.background,
-          logo: cinemataData.logo,
-          description: description,
-          genres: cinemataData.genres,
-          director: cinemataData.director,
-          cast: cinemataData.cast,
-          imdbRating: cinemataData.imdbRating,
-          runtime: cinemataData.runtime,
-          releaseInfo: cinemataData.releaseInfo
-        }
+      meta = {
+        id,
+        type: 'movie',
+        name: cinemataData.name,
+        poster: cinemataData.poster,
+        background: cinemataData.background,
+        logo: cinemataData.logo,
+        description: cinemataData.description,
+        genres: cinemataData.genres,
+        director: cinemataData.director,
+        cast: cinemataData.cast,
+        imdbRating: cinemataData.imdbRating,
+        runtime: cinemataData.runtime,
+        releaseInfo: cinemataData.releaseInfo
       };
     }
   }
 
-  return { meta: null };
+  // If we have meta and MDBList is configured, fetch ratings
+  if (meta && mdblistApiKey && id.startsWith('tt')) {
+    try {
+      console.log(`Fetching MDBList ratings for ${id}...`);
+      mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
+      if (mdblistRatings) {
+        const ratingsText = formatRatingsForDescription(mdblistRatings);
+        meta.description = (meta.description || '') + ratingsText;
+        console.log(`Added MDBList ratings to ${id}`);
+      } else {
+        console.log(`No MDBList ratings for ${id}`);
+      }
+    } catch (error) {
+      console.error(`MDBList error for ${id}:`, error.message);
+    }
+  }
+
+  // Apply RPDB poster if configured
+  if (meta && rpdbApiKey && id.startsWith('tt')) {
+    const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
+    if (rpdbPoster) {
+      meta.poster = rpdbPoster;
+      console.log(`Applied RPDB poster for ${id}`);
+    }
+  }
+
+  return meta ? { meta } : { meta: null };
 });
 
 // Start the addon server
