@@ -283,10 +283,13 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
     }
   }
 
-  // Update cache with enriched metadata (ratings + RPDB poster)
-  if (meta && id.startsWith('tt') && (mdblistRatings || rpdbApiKey)) {
-    await getMovieByImdbId.cache.set(id, meta);
-    console.log(`Updated cache for ${id} with enriched data`);
+  // Update catalogCache with enriched metadata (ratings + RPDB poster)
+  if (meta && id.startsWith('tt') && catalogCache && (mdblistRatings || rpdbApiKey)) {
+    const cacheIndex = catalogCache.findIndex(m => m.id === id);
+    if (cacheIndex !== -1) {
+      catalogCache[cacheIndex] = meta;
+      console.log(`Updated cache for ${id} with enriched data`);
+    }
   }
 
   return meta ? { meta } : { meta: null };
