@@ -263,8 +263,18 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
       console.log(`Fetching MDBList ratings for ${id}...`);
       mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
       if (mdblistRatings) {
-        const ratingsText = formatRatingsForDescription(mdblistRatings);
-        meta.description = (meta.description || '') + ratingsText;
+        // Build compact ratings line for releaseInfo (exclude IMDb as it's already shown)
+        const ratingsParts = [];
+        if (mdblistRatings.rottenTomatoes) ratingsParts.push(`🍅 ${mdblistRatings.rottenTomatoes}%`);
+        if (mdblistRatings.metacritic) ratingsParts.push(`Ⓜ️ ${mdblistRatings.metacritic}`);
+        if (mdblistRatings.tmdb) ratingsParts.push(`🎬 ${mdblistRatings.tmdb}`);
+        
+        // Add ratings to releaseInfo (appears next to year)
+        if (ratingsParts.length > 0) {
+          const ratingsLine = ratingsParts.join('  ');
+          meta.releaseInfo = meta.releaseInfo ? `${meta.releaseInfo}  •  ${ratingsLine}` : ratingsLine;
+        }
+        
         console.log(`Added MDBList ratings to ${id}`);
       } else {
         console.log(`No MDBList ratings for ${id}`);
