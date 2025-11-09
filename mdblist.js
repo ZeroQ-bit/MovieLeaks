@@ -32,30 +32,32 @@ export async function getMDBListRatings(imdbId, apiKey) {
 
     const data = await response.json();
     
-    console.log(`MDBList: Response for ${imdbId}:`, JSON.stringify(data).substring(0, 200));
+    console.log(`MDBList: Full response for ${imdbId}:`, JSON.stringify(data));
     
-    if (data.response === 'False' || !data.ratings) {
-      console.log(`No MDBList ratings data for ${imdbId}`);
+    if (data.response === 'False') {
+      console.log(`MDBList returned false for ${imdbId}`);
       return null;
     }
 
-    // Parse and structure the ratings
+    // Parse and structure the ratings - MDBList can have ratings as nested object or at root level
+    const ratingsObj = data.ratings || data;
+    
     const ratings = {
-      imdb: data.ratings?.imdb || data.imdbrating || null,
-      tmdb: data.ratings?.tmdb || data.tmdbrating || null,
-      trakt: data.ratings?.trakt || data.traktrating || null,
-      metacritic: data.ratings?.metacritic || data.metacriticrating || null,
-      rottenTomatoes: data.ratings?.tomatoes || data.tomatoesrating || null,
-      rottenTomatoesAudience: data.ratings?.tomatoesaudience || data.tomatoaudiencerating || null,
-      letterboxd: data.ratings?.letterboxd || null,
-      myanimelist: data.ratings?.myanimelist || data.myanimelistrating || null,
+      imdb: ratingsObj.imdb || data.imdbrating || null,
+      tmdb: ratingsObj.tmdb || data.tmdbrating || null,
+      trakt: ratingsObj.trakt || data.traktrating || null,
+      metacritic: ratingsObj.metacritic || data.metacriticrating || null,
+      rottenTomatoes: ratingsObj.tomatoes || ratingsObj.tomatoesrating || data.tomatoes || data.tomatoesrating || null,
+      rottenTomatoesAudience: ratingsObj.tomatoesaudience || ratingsObj.tomatoaudiencerating || data.tomatoesaudience || null,
+      letterboxd: ratingsObj.letterboxd || data.letterboxdrating || null,
+      myanimelist: ratingsObj.myanimelist || data.myanimelistrating || null,
       
       // Additional metadata
       votes: {
-        imdb: data.ratings?.imdbvotes || null,
-        tmdb: data.ratings?.tmdbvotes || null,
-        trakt: data.ratings?.traktvotes || null,
-        letterboxd: data.ratings?.letterboxdvotes || null
+        imdb: ratingsObj.imdbvotes || data.imdbvotes || null,
+        tmdb: ratingsObj.tmdbvotes || data.tmdbvotes || null,
+        trakt: ratingsObj.traktvotes || data.traktvotes || null,
+        letterboxd: ratingsObj.letterboxdvotes || data.letterboxdvotes || null
       },
       
       // Certifications
@@ -71,7 +73,18 @@ export async function getMDBListRatings(imdbId, apiKey) {
       year: data.year || null
     };
 
-    console.log(`MDBList ratings fetched for ${imdbId}: RT=${ratings.rottenTomatoes}%, IMDb=${ratings.imdb}`);
+    console.log(`MDBList ratings fetched for ${imdbId}: RT=${ratings.rottenTomatoes}%, IMDb=${ratings.imdb}, TMDb=${ratings.tmdb}, Metacritic=${ratings.metacritic}`);
+    
+    // Check if we got any actual ratings
+    const hasAnyRating = ratings.imdb || ratings.tmdb || ratings.trakt || 
+                         ratings.metacritic || ratings.rottenTomatoes || 
+                         ratings.rottenTomatoesAudience || ratings.letterboxd;
+    
+    if (!hasAnyRating) {
+      console.log(`No actual ratings available for ${imdbId}`);
+      return null;
+    }
+    
     return ratings;
   } catch (error) {
     console.error(`Error fetching MDBList data for ${imdbId}:`, error.message);
