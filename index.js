@@ -234,30 +234,15 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
       // Make a deep copy to avoid mutating cache
       meta = JSON.parse(JSON.stringify(cached));
       console.log(`Found ${id} in cache`);
+    } else {
+      // Not in our catalog - don't provide metadata
+      // Let Cinemeta handle it to avoid conflicts
+      console.log(`${id} not in our catalog, skipping`);
+      return { meta: null };
     }
-  }
-
-  // If not in cache and has IMDb ID, fetch from Cinemeta
-  if (!meta && id.startsWith('tt')) {
-    console.log(`Fetching ${id} from Cinemeta...`);
-    const cinemataData = await getMovieByImdbId(id);
-    if (cinemataData) {
-      meta = {
-        id,
-        type: 'movie',
-        name: cinemataData.name,
-        poster: cinemataData.poster,
-        background: cinemataData.background,
-        logo: cinemataData.logo,
-        description: cinemataData.description,
-        genres: cinemataData.genres,
-        director: cinemataData.director,
-        cast: cinemataData.cast,
-        imdbRating: cinemataData.imdbRating,
-        runtime: cinemataData.runtime,
-        releaseInfo: cinemataData.releaseInfo
-      };
-    }
+  } else {
+    // No catalog cache yet, can't provide metadata
+    return { meta: null };
   }
 
   // If we have meta and MDBList is configured, fetch ratings
