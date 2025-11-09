@@ -223,14 +223,30 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
   if (catalogCache) {
     const cached = catalogCache.find(m => m.id === id);
     if (cached) {
+      // Make a copy to avoid mutating cache
+      const meta = { ...cached };
+      
       // Apply RPDB poster if configured
       if (rpdbApiKey && id.startsWith('tt')) {
         const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
         if (rpdbPoster) {
-          cached.poster = rpdbPoster;
+          meta.poster = rpdbPoster;
         }
       }
-      return { meta: cached };
+      
+      // Fetch and add MDBList ratings if configured
+      if (mdblistApiKey && id.startsWith('tt')) {
+        try {
+          const mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
+          if (mdblistRatings) {
+            meta.description = (meta.description || '') + formatRatingsForDescription(mdblistRatings);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch MDBList data for ${id}:`, error.message);
+        }
+      }
+      
+      return { meta };
     }
   }
 

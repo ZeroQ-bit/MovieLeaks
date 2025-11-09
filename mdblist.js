@@ -9,12 +9,15 @@ import fetch from 'node-fetch';
  */
 export async function getMDBListRatings(imdbId, apiKey) {
   if (!apiKey || !imdbId || !imdbId.startsWith('tt')) {
+    console.log(`MDBList: Skipping ${imdbId} - missing API key or invalid IMDb ID`);
     return null;
   }
 
   try {
     // MDBList API endpoint
     const url = `https://mdblist.com/api/?apikey=${apiKey}&i=${imdbId}`;
+    
+    console.log(`MDBList: Fetching ratings for ${imdbId}...`);
     
     const response = await fetch(url, {
       headers: {
@@ -23,14 +26,16 @@ export async function getMDBListRatings(imdbId, apiKey) {
     });
 
     if (!response.ok) {
-      console.error(`MDBList API error: ${response.status} ${response.statusText}`);
+      console.error(`MDBList API error for ${imdbId}: ${response.status} ${response.statusText}`);
       return null;
     }
 
     const data = await response.json();
     
+    console.log(`MDBList: Response for ${imdbId}:`, JSON.stringify(data).substring(0, 200));
+    
     if (data.response === 'False' || !data.ratings) {
-      console.log(`No MDBList data for ${imdbId}`);
+      console.log(`No MDBList ratings data for ${imdbId}`);
       return null;
     }
 
