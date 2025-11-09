@@ -9,7 +9,7 @@ const { serveHTTP } = addonSDK;
 
 // Configuration
 const PORT = process.env.PORT || 7000;
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Simple in-memory cache
 let catalogCache = null;
@@ -18,7 +18,7 @@ let cacheTimestamp = null;
 // Addon manifest
 const manifest = {
   id: 'com.movieleaks.stremio',
-  version: '1.0.0',
+  version: '1.1.0',
   name: 'Movie Leaks Catalog',
   description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n☕ Support: https://ko-fi.com/zeroq',
   logo: 'https://i.imgur.com/hovSkIN.png',
