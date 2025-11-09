@@ -16,8 +16,8 @@ let cacheTimestamp = null;
 
 // Addon manifest
 const manifest = {
-  id: 'com.movieleaks.stremio',
-  version: '1.3.0',
+  id: 'community.movieleaks',
+  version: '1.3.1',
   name: 'Movie Leaks Catalog',
   description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit with RPDB poster support\n\n☕ Support: https://ko-fi.com/zeroq',
   logo: 'https://i.imgur.com/hovSkIN.png',
@@ -144,9 +144,9 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       background: cinemataData?.background,
       logo: cinemataData?.logo,
       description: description,
-      genres: cinemataData?.genres || [],
+      genres: Array.isArray(cinemataData?.genres) ? cinemataData.genres : [],
       director: cinemataData?.director,
-      cast: cinemataData?.cast,
+      cast: Array.isArray(cinemataData?.cast) ? cinemataData.cast : [],
       imdbRating: cinemataData?.imdbRating,
       runtime: cinemataData?.runtime,
       links: [
