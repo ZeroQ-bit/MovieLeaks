@@ -263,16 +263,16 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
       console.log(`Fetching MDBList ratings for ${id}...`);
       mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
       if (mdblistRatings) {
-        // Build compact ratings line for releaseInfo (exclude IMDb as it's already shown)
+        // Build compact ratings line for description (exclude IMDb as it's already shown)
         const ratingsParts = [];
         if (mdblistRatings.rottenTomatoes) ratingsParts.push(`🍅 ${mdblistRatings.rottenTomatoes}%`);
         if (mdblistRatings.metacritic) ratingsParts.push(`Ⓜ️ ${mdblistRatings.metacritic}`);
         if (mdblistRatings.tmdb) ratingsParts.push(`🎬 ${mdblistRatings.tmdb}`);
         
-        // Add ratings to releaseInfo (appears next to year)
+        // Add ratings at the top of description
         if (ratingsParts.length > 0) {
           const ratingsLine = ratingsParts.join('  ');
-          meta.releaseInfo = meta.releaseInfo ? `${meta.releaseInfo}  •  ${ratingsLine}` : ratingsLine;
+          meta.description = `${ratingsLine}\n\n${meta.description || ''}`;
         }
         
         console.log(`Added MDBList ratings to ${id}`);
