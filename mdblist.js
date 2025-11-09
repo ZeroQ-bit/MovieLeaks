@@ -108,35 +108,35 @@ export function formatRatingsForDescription(ratings) {
 
   const parts = [];
 
-  if (ratings.rottenTomatoes) {
-    parts.push(`🍅 Rotten Tomatoes: ${ratings.rottenTomatoes}%`);
-  }
-  
-  if (ratings.rottenTomatoesAudience) {
-    parts.push(`🍿 RT Audience: ${ratings.rottenTomatoesAudience}%`);
+  if (ratings.imdb) {
+    parts.push(`⭐ ${ratings.imdb}`);
   }
 
-  if (ratings.imdb) {
-    parts.push(`⭐ IMDb: ${ratings.imdb}/10`);
+  if (ratings.rottenTomatoes) {
+    parts.push(`� ${ratings.rottenTomatoes}%`);
   }
 
   if (ratings.metacritic) {
-    parts.push(`Ⓜ️ Metacritic: ${ratings.metacritic}/100`);
+    parts.push(`Ⓜ️ ${ratings.metacritic}`);
   }
 
   if (ratings.tmdb) {
-    parts.push(`🎬 TMDb: ${ratings.tmdb}/10`);
+    parts.push(`🎬 ${ratings.tmdb}`);
+  }
+
+  if (ratings.rottenTomatoesAudience) {
+    parts.push(`� ${ratings.rottenTomatoesAudience}%`);
   }
 
   if (ratings.trakt) {
-    parts.push(`📺 Trakt: ${ratings.trakt}%`);
+    parts.push(`📺 ${ratings.trakt}%`);
   }
 
   if (ratings.letterboxd) {
-    parts.push(`📽️ Letterboxd: ${ratings.letterboxd}/5`);
+    parts.push(`📽️ ${ratings.letterboxd}`);
   }
 
-  return parts.length > 0 ? '\n\n' + parts.join('\n') : '';
+  return parts.length > 0 ? '\n\n' + parts.join('  ') : '';
 }
 
 /**
