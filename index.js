@@ -2,6 +2,7 @@ import { addonBuilder } from 'stremio-addon-sdk';
 import addonSDK from 'stremio-addon-sdk';
 import { fetchMovieLeaks } from './reddit.js';
 import { getMovieByImdbId } from './cinemeta.js';
+import { getRPDBPosterUrl } from './rpdb.js';
 
 const { serveHTTP } = addonSDK;
 
@@ -19,7 +20,7 @@ const manifest = {
   version: '1.0.0',
   name: 'Movie Leaks Catalog',
   description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n☕ Support: https://ko-fi.com/zeroq',
-  logo: 'https://imgur.com/a/QN9fvjv#hovSkIN',
+  logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
   catalogs: [
@@ -36,9 +37,18 @@ const manifest = {
     }
   ],
   behaviorHints: {
-    configurable: false,
+    configurable: true,
     configurationRequired: false
   },
+  config: [
+    {
+      key: 'rpdb_api_key',
+      type: 'text',
+      title: 'RPDB API Key',
+      required: false,
+      default: ''
+    }
+  ],
   idPrefixes: ['tt', 'ml']
 };
 
@@ -47,10 +57,11 @@ const builder = new addonBuilder(manifest);
 /**
  * Catalog handler - returns list of movies from r/movieleaks
  */
-builder.defineCatalogHandler(async ({ type, id, extra }) => {
+builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
   const PAGE_SIZE = 100; // Stremio's default catalog page size
-  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}`);
+  const rpdbApiKey = config?.rpdb_api_key || '';
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
     return { metas: [] };
@@ -108,7 +119,9 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
       type: 'movie',
       name: cinemataData?.name || movie.title,
       releaseInfo: cinemataData?.releaseInfo || movie.year,
-      poster: cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster',
+      poster: rpdbApiKey && movie.imdbId 
+        ? (getRPDBPosterUrl(movie.imdbId, rpdbApiKey) || cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster')
+        : (cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster'),
       background: cinemataData?.background,
       logo: cinemataData?.logo,
       description: cinemataData?.description || movie.description || `Leaked movie from r/movieleaks\n\nPosted by u/${movie.author} on Reddit.\n\n${movie.redditUrl}`,
@@ -155,7 +168,9 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
 /**
  * Meta handler - returns detailed info for a specific movie
  */
-builder.defineMetaHandler(async ({ type, id }) => {
+builder.defineMetaHandler(async ({ type, id, config }) => {
+  const rpdbApiKey = config?.rpdb_api_key || '';
+  
   if (type !== 'movie') {
     return { meta: null };
   }
@@ -177,7 +192,9 @@ builder.defineMetaHandler(async ({ type, id }) => {
           id,
           type: 'movie',
           name: cinemataData.name,
-          poster: cinemataData.poster,
+          poster: rpdbApiKey 
+            ? (getRPDBPosterUrl(id, rpdbApiKey) || cinemataData.poster)
+            : cinemataData.poster,
           background: cinemataData.background,
           logo: cinemataData.logo,
           description: cinemataData.description,

@@ -7,9 +7,10 @@ A Stremio addon that catalogs leaked and upcoming movies from the r/movieleaks s
 - 📺 **Automatic Catalog**: Fetches latest movie posts from r/movieleaks
 - 🎬 **Movie Parsing**: Extracts movie titles, years, IMDb links, and posters from Reddit posts
 - 🖼️ **Rich Metadata**: Uses Cinemeta (Stremio's official metadata addon) for high-quality posters, genres, descriptions, cast, and IMDb ratings
+- ⭐ **RPDB Integration**: Optional support for RatingPosterDB - get posters with Rotten Tomatoes scores overlaid!
 - ⚡ **Caching**: 30-minute cache to reduce API calls and improve performance
 - 🔗 **Links**: Direct links to Reddit posts and IMDb pages for each movie
-- 🔑 **No API Keys**: Works out of the box without any configuration
+- 🔑 **No API Keys Required**: Works out of the box, RPDB is optional
 
 ## Installation
 
@@ -42,9 +43,32 @@ A Stremio addon that catalogs leaked and upcoming movies from the r/movieleaks s
    - Go to Addons (puzzle icon in top right)
    - Paste this URL in the search box: `http://localhost:7000/manifest.json`
    - Click Install
+   - **Optional**: Configure RPDB API key for posters with Rotten Tomatoes scores (see Configuration below)
    - Browse the "Movie Leaks" catalog in the Discover section
 
 ## Configuration
+
+### RPDB (RatingPosterDB) - Optional
+
+Want posters with Rotten Tomatoes scores overlaid? Follow these steps:
+
+1. **Get an RPDB API Key**:
+   - Visit [RatingPosterDB](https://ratingposterdb.com/)
+   - Sign up for a free account
+   - Get your API key from your account settings
+
+2. **Configure in Stremio**:
+   - When installing the addon, you'll see a configuration screen
+   - Enter your RPDB API key in the "RPDB API Key" field
+   - Click "Install"
+   - Your posters will now show Rotten Tomatoes scores!
+
+3. **Reconfigure Later**:
+   - Go to Stremio's addon settings
+   - Find "Movie Leaks Catalog"
+   - Click the gear icon to update your RPDB API key
+
+**Note**: Without an RPDB key, the addon still works great using regular posters from Cinemeta and Reddit.
 
 ### Environment Variables
 
@@ -75,6 +99,7 @@ MovieLeaks/
 ├── index.js          # Main addon server and handlers
 ├── reddit.js         # Reddit API client and parser
 ├── cinemeta.js       # Cinemeta API integration
+├── rpdb.js           # RatingPosterDB integration
 ├── package.json      # Dependencies and scripts
 ├── .env.example      # Environment template
 └── README.md         # This file
