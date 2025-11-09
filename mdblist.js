@@ -39,25 +39,31 @@ export async function getMDBListRatings(imdbId, apiKey) {
       return null;
     }
 
-    // Parse and structure the ratings - MDBList can have ratings as nested object or at root level
-    const ratingsObj = data.ratings || data;
+    // Parse and structure the ratings - MDBList returns ratings as an array of objects
+    const ratingsArray = data.ratings || [];
+    
+    // Helper function to find rating by source
+    const getRating = (source) => {
+      const rating = ratingsArray.find(r => r.source === source);
+      return rating?.value || null;
+    };
     
     const ratings = {
-      imdb: ratingsObj.imdb || data.imdbrating || null,
-      tmdb: ratingsObj.tmdb || data.tmdbrating || null,
-      trakt: ratingsObj.trakt || data.traktrating || null,
-      metacritic: ratingsObj.metacritic || data.metacriticrating || null,
-      rottenTomatoes: ratingsObj.tomatoes || ratingsObj.tomatoesrating || data.tomatoes || data.tomatoesrating || null,
-      rottenTomatoesAudience: ratingsObj.tomatoesaudience || ratingsObj.tomatoaudiencerating || data.tomatoesaudience || null,
-      letterboxd: ratingsObj.letterboxd || data.letterboxdrating || null,
-      myanimelist: ratingsObj.myanimelist || data.myanimelistrating || null,
+      imdb: getRating('imdb'),
+      tmdb: getRating('tmdb'),
+      trakt: getRating('trakt'),
+      metacritic: getRating('metacritic'),
+      rottenTomatoes: getRating('tomatoes'),
+      rottenTomatoesAudience: getRating('tomatoesaudience'),
+      letterboxd: getRating('letterboxd'),
+      myanimelist: getRating('myanimelist'),
       
       // Additional metadata
       votes: {
-        imdb: ratingsObj.imdbvotes || data.imdbvotes || null,
-        tmdb: ratingsObj.tmdbvotes || data.tmdbvotes || null,
-        trakt: ratingsObj.traktvotes || data.traktvotes || null,
-        letterboxd: ratingsObj.letterboxdvotes || data.letterboxdvotes || null
+        imdb: ratingsArray.find(r => r.source === 'imdb')?.votes || null,
+        tmdb: ratingsArray.find(r => r.source === 'tmdb')?.votes || null,
+        trakt: ratingsArray.find(r => r.source === 'trakt')?.votes || null,
+        letterboxd: ratingsArray.find(r => r.source === 'letterboxd')?.votes || null
       },
       
       // Certifications
