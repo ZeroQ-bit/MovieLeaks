@@ -8,9 +8,10 @@ A Stremio addon that catalogs leaked and upcoming movies from the r/movieleaks s
 - 🎬 **Movie Parsing**: Extracts movie titles, years, IMDb links, and posters from Reddit posts
 - 🖼️ **Rich Metadata**: Uses Cinemeta (Stremio's official metadata addon) for high-quality posters, genres, descriptions, cast, and IMDb ratings
 - ⭐ **RPDB Integration**: Optional support for RatingPosterDB - get posters with Rotten Tomatoes scores overlaid!
+- 🍅 **MDBList Integration**: Optional comprehensive ratings from Rotten Tomatoes, IMDb, Metacritic, TMDb, Trakt, Letterboxd & more!
 - ⚡ **Caching**: 30-minute cache to reduce API calls and improve performance
 - 🔗 **Links**: Direct links to Reddit posts and IMDb pages for each movie
-- 🔑 **No API Keys Required**: Works out of the box, RPDB is optional
+- 🔑 **No API Keys Required**: Works out of the box, RPDB and MDBList are optional
 
 ## Installation
 
@@ -70,6 +71,34 @@ Want posters with Rotten Tomatoes scores overlaid? Follow these steps:
 
 **Note**: Without an RPDB key, the addon still works great using regular posters from Cinemeta and Reddit.
 
+### MDBList - Optional
+
+Want comprehensive ratings from multiple sources displayed in movie descriptions?
+
+1. **Get an MDBList API Key**:
+   - Visit [MDBList](https://mdblist.com/)
+   - Sign up for a free account
+   - Navigate to your [API settings](https://mdblist.com/preferences/) to get your API key
+
+2. **Configure in Stremio**:
+   - When installing the addon, enter your MDBList API key in the "MDBList API Key" field
+   - Click "Install"
+   - Movie descriptions will now include ratings from:
+     - 🍅 Rotten Tomatoes (Critics & Audience)
+     - ⭐ IMDb
+     - Ⓜ️ Metacritic
+     - 🎬 TMDb
+     - 📺 Trakt
+     - 📽️ Letterboxd
+     - And more!
+
+3. **What You Get**:
+   - All ratings displayed in the movie detail page description
+   - Easy comparison across multiple rating platforms
+   - More informed viewing decisions
+
+**Note**: MDBList is completely optional. The addon works perfectly without it using Cinemeta's IMDb ratings.
+
 ### Environment Variables
 
 Create a `.env` file in the project root (optional):
@@ -100,6 +129,7 @@ MovieLeaks/
 ├── reddit.js         # Reddit API client and parser
 ├── cinemeta.js       # Cinemeta API integration
 ├── rpdb.js           # RatingPosterDB integration
+├── mdblist.js        # MDBList ratings integration
 ├── package.json      # Dependencies and scripts
 ├── .env.example      # Environment template
 └── README.md         # This file

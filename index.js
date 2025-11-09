@@ -3,6 +3,7 @@ import addonSDK from 'stremio-addon-sdk';
 import { fetchMovieLeaks } from './reddit.js';
 import { getMovieByImdbId } from './cinemeta.js';
 import { getRPDBPosterUrl } from './rpdb.js';
+import { getMDBListRatings, formatRatingsForDescription } from './mdblist.js';
 
 const { serveHTTP } = addonSDK;
 
@@ -47,6 +48,13 @@ const manifest = {
       title: 'RPDB API Key',
       required: false,
       default: ''
+    },
+    {
+      key: 'mdblist_api_key',
+      type: 'text',
+      title: 'MDBList API Key',
+      required: false,
+      default: ''
     }
   ],
   idPrefixes: ['tt', 'ml']
@@ -61,7 +69,8 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
   const PAGE_SIZE = 100; // Stremio's default catalog page size
   const rpdbApiKey = config?.rpdb_api_key || '';
-  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}`);
+  const mdblistApiKey = config?.mdblist_api_key || '';
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}, MDBList API: ${mdblistApiKey ? 'configured' : 'not configured'}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
     return { metas: [] };
@@ -113,6 +122,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   // Enrich with Cinemeta metadata
   const metas = (await Promise.all(uniqueMovies.map(async (movie) => {
     let cinemataData = null;
+    let mdblistRatings = null;
 
     // Try to fetch from Cinemeta if we have an IMDb ID
     if (movie.imdbId) {
@@ -121,12 +131,29 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       } catch (error) {
         console.error(`Failed to fetch Cinemeta data for ${movie.imdbId}:`, error.message);
       }
+
+      // Fetch MDBList ratings if API key is configured
+      if (mdblistApiKey) {
+        try {
+          mdblistRatings = await getMDBListRatings(movie.imdbId, mdblistApiKey);
+        } catch (error) {
+          console.error(`Failed to fetch MDBList data for ${movie.imdbId}:`, error.message);
+        }
+      }
     }
 
     // Skip movies without IMDb ID and without poster
     if (!movie.imdbId && !movie.poster && !movie.thumbnail) {
       console.log(`Skipping movie without IMDb ID or poster: ${movie.title}`);
       return null;
+    }
+
+    // Build description with ratings
+    let description = cinemataData?.description || movie.description || `Leaked movie from r/movieleaks\n\nPosted by u/${movie.author} on Reddit.\n\n${movie.redditUrl}`;
+    
+    // Add MDBList ratings to description if available
+    if (mdblistRatings) {
+      description += formatRatingsForDescription(mdblistRatings);
     }
 
     // Build meta object
@@ -140,7 +167,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
         : (cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster'),
       background: cinemataData?.background,
       logo: cinemataData?.logo,
-      description: cinemataData?.description || movie.description || `Leaked movie from r/movieleaks\n\nPosted by u/${movie.author} on Reddit.\n\n${movie.redditUrl}`,
+      description: description,
       genres: cinemataData?.genres || [],
       director: cinemataData?.director,
       cast: cinemataData?.cast,
@@ -186,6 +213,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
  */
 builder.defineMetaHandler(async ({ type, id, config }) => {
   const rpdbApiKey = config?.rpdb_api_key || '';
+  const mdblistApiKey = config?.mdblist_api_key || '';
   
   if (type !== 'movie') {
     return { meta: null };
@@ -195,6 +223,13 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
   if (catalogCache) {
     const cached = catalogCache.find(m => m.id === id);
     if (cached) {
+      // Apply RPDB poster if configured
+      if (rpdbApiKey && id.startsWith('tt')) {
+        const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
+        if (rpdbPoster) {
+          cached.poster = rpdbPoster;
+        }
+      }
       return { meta: cached };
     }
   }
@@ -202,7 +237,25 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
   // If not in cache, try to fetch from Cinemeta
   if (id.startsWith('tt')) {
     const cinemataData = await getMovieByImdbId(id);
+    let mdblistRatings = null;
+    
+    // Fetch MDBList ratings if API key is configured
+    if (mdblistApiKey) {
+      try {
+        mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
+      } catch (error) {
+        console.error(`Failed to fetch MDBList data for ${id}:`, error.message);
+      }
+    }
+    
     if (cinemataData) {
+      let description = cinemataData.description;
+      
+      // Add MDBList ratings to description if available
+      if (mdblistRatings) {
+        description += formatRatingsForDescription(mdblistRatings);
+      }
+      
       return {
         meta: {
           id,
@@ -213,7 +266,7 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
             : cinemataData.poster,
           background: cinemataData.background,
           logo: cinemataData.logo,
-          description: cinemataData.description,
+          description: description,
           genres: cinemataData.genres,
           director: cinemataData.director,
           cast: cinemataData.cast,
