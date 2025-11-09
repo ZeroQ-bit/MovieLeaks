@@ -113,7 +113,6 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   // Enrich with Cinemeta metadata
   const metas = (await Promise.all(uniqueMovies.map(async (movie) => {
     let cinemataData = null;
-    let mdblistRatings = null;
 
     // Try to fetch from Cinemeta if we have an IMDb ID
     if (movie.imdbId) {
@@ -121,15 +120,6 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
         cinemataData = await getMovieByImdbId(movie.imdbId);
       } catch (error) {
         console.error(`Failed to fetch Cinemeta data for ${movie.imdbId}:`, error.message);
-      }
-
-      // Fetch MDBList ratings if API key is configured
-      if (mdblistApiKey) {
-        try {
-          mdblistRatings = await getMDBListRatings(movie.imdbId, mdblistApiKey);
-        } catch (error) {
-          console.error(`Failed to fetch MDBList data for ${movie.imdbId}:`, error.message);
-        }
       }
     }
 
@@ -139,13 +129,8 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       return null;
     }
 
-    // Build description with ratings
+    // Build description
     let description = cinemataData?.description || movie.description || `Leaked movie from r/movieleaks\n\nPosted by u/${movie.author} on Reddit.\n\n${movie.redditUrl}`;
-    
-    // Add MDBList ratings to description if available
-    if (mdblistRatings) {
-      description += formatRatingsForDescription(mdblistRatings);
-    }
 
     // Build meta object
     const meta = {
