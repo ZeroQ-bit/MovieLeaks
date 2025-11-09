@@ -3,6 +3,7 @@ import addonSDK from 'stremio-addon-sdk';
 import { fetchMovieLeaks } from './reddit.js';
 import { getMovieByImdbId } from './cinemeta.js';
 import { getRPDBPosterUrl } from './rpdb.js';
+
 import { getMDBListRatings, formatRatingsForDescription } from './mdblist.js';
 
 const { serveHTTP } = addonSDK;
@@ -18,7 +19,7 @@ let cacheTimestamp = null;
 // Addon manifest
 const manifest = {
   id: 'com.movieleaks.stremio',
-  version: '1.1.0',
+  version: '1.2.0',
   name: 'Movie Leaks Catalog',
   description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n☕ Support: https://ko-fi.com/zeroq',
   logo: 'https://i.imgur.com/hovSkIN.png',
@@ -39,22 +40,22 @@ const manifest = {
   ],
   behaviorHints: {
     configurable: true,
-    configurationRequired: false
+    configurationRequired: true
   },
   config: [
     {
       key: 'rpdb_api_key',
       type: 'text',
       title: 'RPDB API Key',
-      required: false,
-      default: ''
+      required: true,
+      default: 't0-free-rpdb'
     },
     {
       key: 'mdblist_api_key',
       type: 'text',
       title: 'MDBList API Key',
-      required: false,
-      default: ''
+      required: true,
+      default: 'xrlgcb0hfaoyk4k7b20w1xv4o'
     }
   ],
   idPrefixes: ['tt', 'ml']
