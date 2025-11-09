@@ -220,7 +220,8 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
   }
 
   // Try to find in cache first
-  if (catalogCache) {
+  if (catalogCache && !mdblistApiKey) {
+    // Only use cache if MDBList is not configured, to avoid ratings disappearing
     const cached = catalogCache.find(m => m.id === id);
     if (cached) {
       // Make a copy to avoid mutating cache
@@ -234,16 +235,38 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
         }
       }
       
-      // Fetch and add MDBList ratings if configured
-      if (mdblistApiKey && id.startsWith('tt')) {
-        try {
-          const mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
-          if (mdblistRatings) {
-            meta.description = (meta.description || '') + formatRatingsForDescription(mdblistRatings);
-          }
-        } catch (error) {
-          console.error(`Failed to fetch MDBList data for ${id}:`, error.message);
+      return { meta };
+    }
+  }
+  
+  // If MDBList is configured OR not in cache, fetch fresh data
+  if (catalogCache && mdblistApiKey) {
+    const cached = catalogCache.find(m => m.id === id);
+    if (cached && id.startsWith('tt')) {
+      // Make a deep copy to avoid mutating cache
+      const meta = JSON.parse(JSON.stringify(cached));
+      
+      // Apply RPDB poster if configured
+      if (rpdbApiKey) {
+        const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
+        if (rpdbPoster) {
+          meta.poster = rpdbPoster;
         }
+      }
+      
+      // Fetch and add MDBList ratings
+      try {
+        console.log(`Fetching MDBList ratings for cached movie ${id}...`);
+        const mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
+        if (mdblistRatings) {
+          const ratingsText = formatRatingsForDescription(mdblistRatings);
+          meta.description = (meta.description || '') + ratingsText;
+          console.log(`Added ratings to ${id}: ${ratingsText.substring(0, 100)}...`);
+        } else {
+          console.log(`No ratings returned for ${id}`);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch MDBList data for ${id}:`, error.message);
       }
       
       return { meta };
