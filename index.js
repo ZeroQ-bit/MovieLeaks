@@ -215,7 +215,9 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
   const rpdbApiKey = config?.rpdb_api_key || '';
   const mdblistApiKey = config?.mdblist_api_key || '';
   
-  console.log(`Meta request for ${id}, MDBList: ${mdblistApiKey ? 'YES' : 'NO'}, RPDB: ${rpdbApiKey ? 'YES' : 'NO'}`);
+  console.log(`Meta request for ${id}`);
+  console.log(`Config received:`, JSON.stringify(config));
+  console.log(`MDBList key: ${mdblistApiKey ? 'YES' : 'NO'}, RPDB key: ${rpdbApiKey ? 'YES' : 'NO'}`);
   
   if (type !== 'movie') {
     return { meta: null };
