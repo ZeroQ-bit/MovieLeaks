@@ -4,8 +4,6 @@ import { fetchMovieLeaks } from './reddit.js';
 import { getMovieByImdbId } from './cinemeta.js';
 import { getRPDBPosterUrl } from './rpdb.js';
 
-import { getMDBListRatings, formatRatingsForDescription } from './mdblist.js';
-
 const { serveHTTP } = addonSDK;
 
 // Configuration
@@ -19,9 +17,9 @@ let cacheTimestamp = null;
 // Addon manifest
 const manifest = {
   id: 'com.movieleaks.stremio',
-  version: '1.2.0',
+  version: '1.3.0',
   name: 'Movie Leaks Catalog',
-  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n☕ Support: https://ko-fi.com/zeroq',
+  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit with RPDB poster support\n\n☕ Support: https://ko-fi.com/zeroq',
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
@@ -40,22 +38,15 @@ const manifest = {
   ],
   behaviorHints: {
     configurable: true,
-    configurationRequired: true
+    configurationRequired: false
   },
   config: [
     {
       key: 'rpdb_api_key',
       type: 'text',
-      title: 'RPDB API Key',
-      required: true,
-      default: 't0-free-rpdb'
-    },
-    {
-      key: 'mdblist_api_key',
-      type: 'text',
-      title: 'MDBList API Key',
-      required: true,
-      default: 'xrlgcb0hfaoyk4k7b20w1xv4o'
+      title: 'RPDB API Key (optional - for poster overlays)',
+      required: false,
+      default: ''
     }
   ],
   idPrefixes: ['tt', 'ml']
@@ -70,8 +61,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
   const PAGE_SIZE = 100; // Stremio's default catalog page size
   const rpdbApiKey = config?.rpdb_api_key || '';
-  const mdblistApiKey = config?.mdblist_api_key || '';
-  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}, MDBList API: ${mdblistApiKey ? 'configured' : 'not configured'}`);
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
     return { metas: [] };
@@ -214,18 +204,15 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
  */
 builder.defineMetaHandler(async ({ type, id, config }) => {
   const rpdbApiKey = config?.rpdb_api_key || '';
-  const mdblistApiKey = config?.mdblist_api_key || '';
   
   console.log(`Meta request for ${id}`);
-  console.log(`Config received:`, JSON.stringify(config));
-  console.log(`MDBList key: ${mdblistApiKey ? 'YES' : 'NO'}, RPDB key: ${rpdbApiKey ? 'YES' : 'NO'}`);
+  console.log(`RPDB key: ${rpdbApiKey ? 'YES' : 'NO'}`);
   
   if (type !== 'movie') {
     return { meta: null };
   }
 
   let meta = null;
-  let mdblistRatings = null;
 
   // Try to find in cache first
   if (catalogCache) {
@@ -245,33 +232,6 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
     return { meta: null };
   }
 
-  // If we have meta and MDBList is configured, fetch ratings
-  if (meta && mdblistApiKey && id.startsWith('tt')) {
-    try {
-      console.log(`Fetching MDBList ratings for ${id}...`);
-      mdblistRatings = await getMDBListRatings(id, mdblistApiKey);
-      if (mdblistRatings) {
-        // Build compact ratings line for description (exclude IMDb as it's already shown)
-        const ratingsParts = [];
-        if (mdblistRatings.rottenTomatoes) ratingsParts.push(`🍅 ${mdblistRatings.rottenTomatoes}%`);
-        if (mdblistRatings.metacritic) ratingsParts.push(`Ⓜ️ ${mdblistRatings.metacritic}`);
-        if (mdblistRatings.tmdb) ratingsParts.push(`🎬 ${mdblistRatings.tmdb}`);
-        
-        // Add ratings at the top of description
-        if (ratingsParts.length > 0) {
-          const ratingsLine = ratingsParts.join('  ');
-          meta.description = `${ratingsLine}\n\n${meta.description || ''}`;
-        }
-        
-        console.log(`Added MDBList ratings to ${id}`);
-      } else {
-        console.log(`No MDBList ratings for ${id}`);
-      }
-    } catch (error) {
-      console.error(`MDBList error for ${id}:`, error.message);
-    }
-  }
-
   // Apply RPDB poster if configured
   if (meta && rpdbApiKey && id.startsWith('tt')) {
     const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
@@ -281,12 +241,12 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
     }
   }
 
-  // Update catalogCache with enriched metadata (ratings + RPDB poster)
-  if (meta && id.startsWith('tt') && catalogCache && (mdblistRatings || rpdbApiKey)) {
+  // Update catalogCache with enriched metadata (RPDB poster)
+  if (meta && id.startsWith('tt') && catalogCache && rpdbApiKey) {
     const cacheIndex = catalogCache.findIndex(m => m.id === id);
     if (cacheIndex !== -1) {
       catalogCache[cacheIndex] = meta;
-      console.log(`Updated cache for ${id} with enriched data`);
+      console.log(`Updated cache for ${id} with RPDB poster`);
     }
   }
 
