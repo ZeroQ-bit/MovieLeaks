@@ -71,8 +71,24 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const now = Date.now();
   if (catalogCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
     console.log(`Returning cached catalog (${catalogCache.length} total items, skip=${skip})`);
-    // Return paginated slice from cache
-    const paginatedMetas = catalogCache.slice(skip, skip + PAGE_SIZE);
+    // Return paginated slice from cache, but apply RPDB posters if configured
+    let paginatedMetas = catalogCache.slice(skip, skip + PAGE_SIZE);
+    
+    // Apply RPDB posters if API key is configured
+    if (rpdbApiKey) {
+      console.log(`Applying RPDB posters to cached results`);
+      paginatedMetas = paginatedMetas.map(meta => {
+        // Only apply RPDB if movie has IMDb ID
+        if (meta.id && meta.id.startsWith('tt')) {
+          const rpdbPoster = getRPDBPosterUrl(meta.id, rpdbApiKey);
+          if (rpdbPoster) {
+            return { ...meta, poster: rpdbPoster };
+          }
+        }
+        return meta;
+      });
+    }
+    
     console.log(`Returning ${paginatedMetas.length} items from position ${skip}`);
     return { metas: paginatedMetas };
   }
