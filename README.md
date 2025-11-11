@@ -116,37 +116,55 @@ Once running, the addon exposes these endpoints:
 
 ## Deployment
 
-### Local Network Access
+### 🌐 Public Deployment (Vercel - Recommended)
+
+Deploy your addon so others can use it:
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Login and deploy
+vercel login
+vercel
+
+# For production deployment
+vercel --prod
+```
+
+Your addon will be available at: `https://your-project.vercel.app/manifest.json`
+
+**📖 Full deployment guide:** See [DEPLOYMENT.md](./DEPLOYMENT.md)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Zerr0-C00L/Movie-Leaks)
+
+### 📢 Publishing to Stremio Community Addons
+
+After deployment, you can submit your addon to the community:
+
+1. Visit: **https://beta.stremio-addons.net**
+2. Submit your manifest URL: `https://your-project.vercel.app/manifest.json`
+
+**Note:** Not all community addons appear in Stremio's internal catalog. Users can always install your addon directly by pasting your manifest URL in Stremio!
+
+**Share your addon URL:**
+```
+https://your-project.vercel.app/manifest.json
+```
+Users can install it via: Stremio → Addons → Install from URL
+
+### 🏠 Local Network Access
 
 To access from other devices on your network:
 1. Find your local IP address (e.g., `192.168.1.100`)
 2. Use `http://192.168.1.100:7000/manifest.json` in Stremio
 
-### Cloud Deployment (Vercel)
-
-This addon can be deployed to Vercel for free:
-
-1. Install Vercel CLI:
-   ```bash
-   npm install -g vercel
-   ```
-
-2. Deploy:
-   ```bash
-   vercel
-   ```
-
-3. Set environment variables in Vercel dashboard:
-   - Go to your project settings
-   - Add `TMDB_API_KEY` if you want enhanced metadata
-
-4. Use the Vercel URL in Stremio: `https://your-project.vercel.app/manifest.json`
-
-### Other Platforms
+### 🔧 Other Platforms
 
 The addon can also run on:
 - **Heroku**: Add a `Procfile` with `web: node index.js`
 - **Railway**: Works out of the box
+- **Beamup**: Stremio's recommended platform
 - **Glitch**: Import from GitHub and set secrets
 - **DigitalOcean App Platform**: Deploy as a web service
 
@@ -195,6 +213,29 @@ If you want to add actual streaming capability:
 1. Add `"stream"` to the `resources` array in `manifest` (index.js)
 2. Implement a `defineStreamHandler` that returns torrent/stream links
 3. Parse magnet links or streaming URLs from Reddit posts/comments
+
+## Bug Reports & Feature Requests
+
+Found a bug or have a feature idea? Please report it!
+
+### How to Report Issues
+
+1. **Check Existing Issues**: Visit our [Issues page](https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues) to see if it's already been reported
+2. **Create a New Issue**: Click "New Issue" and choose the appropriate template:
+   - 🐛 **Bug Report** - For bugs and problems
+   - ✨ **Feature Request** - For new features or enhancements
+3. **Provide Details**: Fill out the template with as much information as possible
+
+### What to Include
+
+- **For Bugs**: Steps to reproduce, screenshots, Stremio version, platform (Windows/Mac/Android/etc.)
+- **For Features**: Clear description of what you want and why it would be useful
+
+### Alternative Support
+
+- **Community**: Join the [Stremio Discord](https://discord.gg/zNRf6YF) for quick help
+- **Email**: Contact directly for private issues
+- **Support Development**: [Ko-fi donations](https://ko-fi.com/zeroq) help keep this project alive!
 
 ## Credits
 

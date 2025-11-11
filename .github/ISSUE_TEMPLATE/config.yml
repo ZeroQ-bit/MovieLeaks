@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discord Community Support
+    url: https://discord.gg/zNRf6YF
+    about: Join the Stremio Discord for community help and discussions
+  - name: Stremio Official Support
+    url: https://www.stremio.com/support
+    about: For general Stremio questions and official support
+  - name: Ko-fi Support
+    url: https://ko-fi.com/zeroq
+    about: Support the development of this addon
