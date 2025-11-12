@@ -10,14 +10,14 @@ const { serveHTTP } = addonSDK;
 const PORT = process.env.PORT || 7000;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Simple in-memory cache
-let catalogCache = null;
-let cacheTimestamp = null;
+// Simple in-memory cache - separate cache for each sort type
+const catalogCache = {};
+const cacheTimestamp = {};
 
 // Addon manifest
 const manifest = {
   id: 'community.movieleaks',
-  version: '1.3.1',
+  version: '1.3.2',
   name: 'Movie Leaks Catalog',
   description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit with RPDB poster support\n\n☕ Support: https://ko-fi.com/zeroq\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
   logo: 'https://i.imgur.com/hovSkIN.png',
@@ -28,7 +28,14 @@ const manifest = {
       type: 'movie',
       id: 'movieleaks',
       name: 'Latest Leaks',
+      posterShape: 'poster',
       extra: [
+        {
+          name: 'sort',
+          isRequired: false,
+          options: ['new', 'hot', 'top', 'rising'],
+          optionsLimit: 1
+        },
         {
           name: 'skip',
           isRequired: false
@@ -59,20 +66,22 @@ const builder = new addonBuilder(manifest);
  */
 builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
+  const sort = extra?.sort || 'new'; // Default to 'new' if not specified
   const PAGE_SIZE = 100; // Stremio's default catalog page size
   const rpdbApiKey = config?.rpdb_api_key || '';
-  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}`);
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, sort=${sort}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
     return { metas: [] };
   }
 
-  // Check cache
+  // Check cache for this specific sort
   const now = Date.now();
-  if (catalogCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
-    console.log(`Returning cached catalog (${catalogCache.length} total items, skip=${skip})`);
+  const cacheKey = sort;
+  if (catalogCache[cacheKey] && cacheTimestamp[cacheKey] && (now - cacheTimestamp[cacheKey]) < CACHE_DURATION) {
+    console.log(`Returning cached catalog for sort=${sort} (${catalogCache[cacheKey].length} total items, skip=${skip})`);
     // Return paginated slice from cache, but apply RPDB posters if configured
-    let paginatedMetas = catalogCache.slice(skip, skip + PAGE_SIZE);
+    let paginatedMetas = catalogCache[cacheKey].slice(skip, skip + PAGE_SIZE);
     
     // Apply RPDB posters if API key is configured
     if (rpdbApiKey) {
@@ -93,10 +102,15 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     return { metas: paginatedMetas };
   }
 
-  console.log('Fetching fresh data from Reddit...');
+  console.log(`Fetching fresh data from Reddit with sort=${sort}...`);
   
   // Fetch movies from Reddit (JSON API supports pagination)
-  const movies = await fetchMovieLeaks(300);
+  // Calculate how many posts we need based on skip value
+  // Reddit has ~300-500 recent posts, so fetch enough to cover pagination
+  const neededPosts = Math.max(500, skip + PAGE_SIZE + 200);
+  console.log(`Fetching ${neededPosts} posts to cover skip=${skip}`);
+  
+  const movies = await fetchMovieLeaks(neededPosts, sort);
   
   // Remove duplicates based on IMDb ID or slug
   const uniqueMovies = [];
@@ -141,6 +155,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       poster: rpdbApiKey && movie.imdbId 
         ? (getRPDBPosterUrl(movie.imdbId, rpdbApiKey) || cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster')
         : (cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster'),
+      posterShape: 'poster',
       background: cinemataData?.background,
       logo: cinemataData?.logo,
       description: description,
@@ -170,9 +185,9 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     return meta;
   }))).filter(meta => meta !== null);
 
-  // Update cache
-  catalogCache = metas;
-  cacheTimestamp = now;
+  // Update cache for this sort type
+  catalogCache[cacheKey] = metas;
+  cacheTimestamp[cacheKey] = now;
 
   console.log(`Catalog updated with ${metas.length} movies total`);
   
@@ -180,6 +195,12 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const paginatedMetas = metas.slice(skip, skip + PAGE_SIZE);
   
   console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, totalAvailable=${metas.length}`);
+  
+  // If we have no more items to return, return empty array
+  // Otherwise Stremio will keep requesting
+  if (paginatedMetas.length === 0) {
+    console.log('No more items available');
+  }
   
   return { metas: paginatedMetas };
 });
@@ -199,21 +220,23 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
 
   let meta = null;
 
-  // Try to find in cache first
-  if (catalogCache) {
-    const cached = catalogCache.find(m => m.id === id);
-    if (cached) {
-      // Make a deep copy to avoid mutating cache
-      meta = JSON.parse(JSON.stringify(cached));
-      console.log(`Found ${id} in cache`);
-    } else {
-      // Not in our catalog - don't provide metadata
-      // Let Cinemeta handle it to avoid conflicts
-      console.log(`${id} not in our catalog, skipping`);
-      return { meta: null };
+  // Try to find in cache first - search all sort caches
+  let cached = null;
+  for (const sortKey in catalogCache) {
+    if (catalogCache[sortKey]) {
+      cached = catalogCache[sortKey].find(m => m.id === id);
+      if (cached) break;
     }
+  }
+  
+  if (cached) {
+    // Make a deep copy to avoid mutating cache
+    meta = JSON.parse(JSON.stringify(cached));
+    console.log(`Found ${id} in cache`);
   } else {
-    // No catalog cache yet, can't provide metadata
+    // Not in our catalog - don't provide metadata
+    // Let Cinemeta handle it to avoid conflicts
+    console.log(`${id} not in our catalog, skipping`);
     return { meta: null };
   }
 
@@ -226,12 +249,16 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
     }
   }
 
-  // Update catalogCache with enriched metadata (RPDB poster)
-  if (meta && id.startsWith('tt') && catalogCache && rpdbApiKey) {
-    const cacheIndex = catalogCache.findIndex(m => m.id === id);
-    if (cacheIndex !== -1) {
-      catalogCache[cacheIndex] = meta;
-      console.log(`Updated cache for ${id} with RPDB poster`);
+  // Update catalogCache with enriched metadata (RPDB poster) - update in all caches
+  if (meta && id.startsWith('tt') && rpdbApiKey) {
+    for (const sortKey in catalogCache) {
+      if (catalogCache[sortKey]) {
+        const cacheIndex = catalogCache[sortKey].findIndex(m => m.id === id);
+        if (cacheIndex !== -1) {
+          catalogCache[sortKey][cacheIndex] = meta;
+          console.log(`Updated cache for ${id} with RPDB poster in sort=${sortKey}`);
+        }
+      }
     }
   }
 

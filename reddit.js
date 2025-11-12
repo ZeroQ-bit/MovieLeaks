@@ -3,16 +3,17 @@ import fetch from 'node-fetch';
 /**
  * Fetches posts from r/movieleaks using both JSON API and RSS as fallback
  * @param {number} limit - Maximum number of posts to fetch
+ * @param {string} sort - Sort type: 'new', 'hot', 'top', 'rising' (default: 'new')
  * @returns {Promise<Array>} Array of parsed movie data
  */
-export async function fetchMovieLeaks(limit = 300) {
+export async function fetchMovieLeaks(limit = 300, sort = 'new') {
   let allPosts = [];
   
   // Try JSON API first
   try {
-    allPosts = await fetchFromJsonApi(limit);
+    allPosts = await fetchFromJsonApi(limit, sort);
     if (allPosts.length > 0) {
-      console.log(`Successfully fetched ${allPosts.length} posts from JSON API`);
+      console.log(`Successfully fetched ${allPosts.length} posts from JSON API with sort=${sort}`);
     } else {
       throw new Error('No posts from JSON API, trying RSS');
     }
@@ -20,7 +21,7 @@ export async function fetchMovieLeaks(limit = 300) {
     console.log(`JSON API failed: ${error.message}, falling back to RSS`);
     // Fallback to RSS
     try {
-      allPosts = await fetchFromRSS();
+      allPosts = await fetchFromRSS(sort);
       console.log(`Successfully fetched ${allPosts.length} posts from RSS`);
     } catch (rssError) {
       console.error('Both JSON API and RSS failed:', rssError.message);
@@ -40,13 +41,13 @@ export async function fetchMovieLeaks(limit = 300) {
 /**
  * Fetch from Reddit JSON API with pagination
  */
-async function fetchFromJsonApi(limit) {
+async function fetchFromJsonApi(limit, sort = 'new') {
   const allPosts = [];
   let after = null;
   const postsPerPage = 100;
   
   while (allPosts.length < limit) {
-    const url = `https://www.reddit.com/r/movieleaks/new.json?limit=${postsPerPage}${after ? `&after=${after}` : ''}`;
+    const url = `https://www.reddit.com/r/movieleaks/${sort}.json?limit=${postsPerPage}${after ? `&after=${after}` : ''}`;
     
     const response = await fetch(url, {
       headers: {
@@ -84,8 +85,9 @@ async function fetchFromJsonApi(limit) {
 /**
  * Fetch from Reddit RSS feed (fallback)
  */
-async function fetchFromRSS() {
-  const url = `https://www.reddit.com/r/movieleaks/new/.rss?limit=100`;
+async function fetchFromRSS(sort = 'new') {
+  console.log(`Fetching from Reddit RSS feed (${sort} sort)...`);
+  const url = `https://www.reddit.com/r/movieleaks/${sort}/.rss?limit=100`;
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
