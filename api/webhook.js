@@ -195,26 +195,59 @@ export default async function handler(req, res) {
     switch (kofiData.type) {
       case 'Donation':
       case 'Subscription': {
-        // New subscription or donation - generate code
-        const supporter = await addCode(kofiData.email, kofiData);
+        // Generate code directly (can't write to file in serverless)
+        const crypto = await import('crypto');
+        const code = crypto.randomBytes(16).toString('hex').toUpperCase();
         
-        if (supporter) {
-          console.log('✅ Generated code for', kofiData.email, ':', supporter.code);
-          
-          // Send email with the code
-          await sendCodeEmail(kofiData.email, kofiData.from_name, supporter.code, false);
-          
-          // Return code so Ko-fi can include it in confirmation email
-          // You can customize Ko-fi's thank you message to include {data.code}
-          return res.status(200).json({
-            success: true,
-            code: supporter.code,
-            message: `Thank you! Your supporter code is: ${supporter.code}`
-          });
+        console.log('✅ Generated code for', kofiData.email, ':', code);
+        
+        // Trigger GitHub Actions to add code to supporters.json
+        const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+        if (GITHUB_TOKEN) {
+          try {
+            const response = await fetch('https://api.github.com/repos/Zerr0-C00L/Movie-Leaks/dispatches', {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                event_type: 'new-supporter',
+                client_payload: {
+                  email: kofiData.email,
+                  name: kofiData.from_name,
+                  code: code,
+                  transaction_id: kofiData.message_id || 'kofi-' + Date.now(),
+                  amount: kofiData.amount,
+                  currency: kofiData.currency || 'USD'
+                }
+              })
+            });
+            
+            if (response.ok) {
+              console.log('✅ GitHub Actions triggered successfully');
+            } else {
+              console.error('❌ Failed to trigger GitHub Actions:', response.status);
+            }
+          } catch (error) {
+            console.error('❌ Error triggering GitHub Actions:', error.message);
+          }
         } else {
-          console.error('Failed to generate code');
-          return res.status(500).json({ error: 'Failed to generate code' });
+          console.log('⚠️  GITHUB_TOKEN not configured - skipping auto-add');
         }
+        
+        // Send email with the code
+        const emailSent = await sendCodeEmail(kofiData.email, kofiData.from_name, code, false);
+        
+        // Return code
+        return res.status(200).json({
+          success: true,
+          code: code,
+          email_sent: emailSent,
+          message: `Code generated and email sent to ${kofiData.email}`
+        });
       }
 
       case 'Subscription Payment': {

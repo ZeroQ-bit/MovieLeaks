@@ -1,0 +1,57 @@
+name: Add Supporter Code
+
+on:
+  repository_dispatch:
+    types: [new-supporter]
+
+jobs:
+  add-code:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Add supporter code
+        run: |
+          # Get data from webhook
+          EMAIL="${{ github.event.client_payload.email }}"
+          NAME="${{ github.event.client_payload.name }}"
+          CODE="${{ github.event.client_payload.code }}"
+          TRANSACTION_ID="${{ github.event.client_payload.transaction_id }}"
+          
+          # Calculate expiry date (30 days from now)
+          CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EXPIRES=$(date -u -d "+30 days" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v+30d +"%Y-%m-%dT%H:%M:%SZ")
+          
+          # Add to supporters.json using jq
+          jq --arg email "$EMAIL" \
+             --arg name "$NAME" \
+             --arg code "$CODE" \
+             --arg transaction "$TRANSACTION_ID" \
+             --arg created "$CREATED" \
+             --arg expires "$EXPIRES" \
+             '.codes += [{
+               "code": $code,
+               "email": $email,
+               "status": "active",
+               "created_at": $created,
+               "expires_at": $expires,
+               "kofi_transaction_id": $transaction,
+               "kofi_from_name": $name
+             }]' supporters.json > supporters.tmp.json
+          
+          mv supporters.tmp.json supporters.json
+          
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add supporters.json
+          git commit -m "Add supporter code for ${{ github.event.client_payload.email }}"
+          git push
