@@ -18,7 +18,15 @@ export default async function handler(req, res) {
 
   try {
     // Ko-fi sends data as form-data with key 'data'
-    const kofiData = JSON.parse(req.body.data || '{}');
+    // For testing, also accept direct JSON
+    let kofiData;
+    if (req.body.data) {
+      // Real Ko-fi webhook format
+      kofiData = JSON.parse(req.body.data);
+    } else {
+      // Testing format (direct JSON)
+      kofiData = req.body;
+    }
     
     console.log('Ko-fi webhook received:', {
       type: kofiData.type,
