@@ -24,16 +24,6 @@ const manifest = {
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
-  behaviorHints: {
-    configurable: true,
-    configurationRequired: false
-  },
-  buttons: [
-    {
-      name: '☕ Become a Supporter',
-      href: 'https://ko-fi.com/summary/37518cef-e7d4-4c6b-b44d-fb6b422ad6ca'
-    }
-  ],
   catalogs: [
     {
       type: 'movie',
@@ -70,6 +60,10 @@ const manifest = {
       default: ''
     }
   ],
+  behaviorHints: {
+    configurable: true,
+    configurationRequired: false
+  },
   idPrefixes: ['tt', 'ml']
 };
 
