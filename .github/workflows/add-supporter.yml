@@ -4,6 +4,9 @@ on:
   repository_dispatch:
     types: [new-supporter]
 
+permissions:
+  contents: write
+
 jobs:
   add-code:
     runs-on: ubuntu-latest
