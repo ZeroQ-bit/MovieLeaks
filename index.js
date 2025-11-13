@@ -19,7 +19,7 @@ const manifest = {
   id: 'community.movieleaks',
   version: '1.3.2',
   name: 'Movie Leaks Catalog',
-  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit with RPDB poster support\n\n🙏 Help keep this addon alive! Server costs + maintenance need your support.\n☕ Support: https://ko-fi.com/zeroq\n\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
+  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit with RPDB poster support\n\n━━━━━━━━━━━━━━━━━━\n☕ Buy me a coffee to keep this running!\n👉 https://ko-fi.com/zeroq\n\n🎬 Updated daily\n⚡ Server costs + development time need YOUR support!\n\n━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
