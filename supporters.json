@@ -1,0 +1,49 @@
+{
+  "codes": [
+    {
+      "code": "FC1D4D5B7D7645D69DDB7FDC63D9C5B8",
+      "email": "test@example.com",
+      "status": "active",
+      "created_at": "2025-11-13T04:56:27.345Z",
+      "expires_at": "2025-12-13T04:56:27.345Z",
+      "kofi_transaction_id": "test123",
+      "kofi_from_name": "Test User"
+    },
+    {
+      "code": "8AFEA309FAF6FEB2C2EEC8468318953D",
+      "email": "test@example.com",
+      "status": "active",
+      "created_at": "2025-11-13T04:56:38.813Z",
+      "expires_at": "2025-12-13T04:56:38.813Z",
+      "kofi_transaction_id": "test123",
+      "kofi_from_name": "Test User"
+    },
+    {
+      "code": "0F4830A11F84161418DB0BE4CAC2B26F",
+      "email": "realtest@example.com",
+      "status": "active",
+      "created_at": "2025-11-13T05:14:41.392Z",
+      "expires_at": "2025-12-13T05:14:41.392Z",
+      "kofi_transaction_id": "test-1763010881392",
+      "kofi_from_name": "Real Test User"
+    },
+    {
+      "code": "3F593074A64C69B57347E58A2F7993AE",
+      "email": "luisitoa76@gmail.com",
+      "status": "active",
+      "created_at": "2025-11-13T22:35:58.972Z",
+      "expires_at": "2025-12-13T22:35:58.972Z",
+      "kofi_transaction_id": "manual-1763073358972",
+      "kofi_from_name": "Ocele78"
+    },
+    {
+      "code": "1769788960E632B3799A8D669729A47B",
+      "email": "luisitoa76@gmail.com",
+      "status": "active",
+      "created_at": "2025-11-13T22:37:02.803Z",
+      "expires_at": "2025-12-13T22:37:02.803Z",
+      "kofi_transaction_id": "manual-1763073422803",
+      "kofi_from_name": "Ocele78"
+    }
+  ]
+}
