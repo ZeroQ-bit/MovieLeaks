@@ -20,10 +20,20 @@ const manifest = {
   id: 'community.movieleaks',
   version: '1.4.0',
   name: 'Movie Leaks Catalog',
-  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🆓 FREE TIER: 100 movies\n💎 SUPPORTER TIER: All 477+ movies\n🎨 RPDB: Optional (supporters bring their own key)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n☕ Become a Supporter ($5/month):\n👉 https://ko-fi.com/zeroq/membership\n\nAfter subscribing, enter your code below to unlock!\n\nOptional: Add your RPDB key for enhanced posters\nGet free key at: ratingposterdb.com\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
+  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n━━━━━━━━━━━━━━━━━━━\n🆓 FREE TIER: 100 movies\n💎 SUPPORTER TIER: All Movies\n🎨 RPDB: Optional (supporters bring their own key)\n━━━━━━━━━━━━━━━━━━━\n\n☕ Become a Supporter ($5/month):\n👉 https://ko-fi.com/zeroq/membership\n\nAfter subscribing, enter your code below to unlock!\n\nOptional: Add your RPDB key for enhanced posters\nGet free key at: ratingposterdb.com\n\n━━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
+  behaviorHints: {
+    configurable: true,
+    configurationRequired: false
+  },
+  buttons: [
+    {
+      name: '☕ Become a Supporter',
+      href: 'https://ko-fi.com/summary/37518cef-e7d4-4c6b-b44d-fb6b422ad6ca'
+    }
+  ],
   catalogs: [
     {
       type: 'movie',
@@ -44,10 +54,6 @@ const manifest = {
       ]
     }
   ],
-  behaviorHints: {
-    configurable: true,
-    configurationRequired: false
-  },
   config: [
     {
       key: 'supporter_code',
