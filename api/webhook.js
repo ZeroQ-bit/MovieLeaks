@@ -175,12 +175,14 @@ export default async function handler(req, res) {
       type: kofiData.type,
       from: kofiData.from_name,
       email: kofiData.email,
-      amount: kofiData.amount
+      amount: kofiData.amount,
+      hasToken: !!kofiData.verification_token,
+      tokenMatch: kofiData.verification_token === KOFI_VERIFICATION_TOKEN
     });
 
     // Verify token if configured
     if (KOFI_VERIFICATION_TOKEN && kofiData.verification_token !== KOFI_VERIFICATION_TOKEN) {
-      console.error('Invalid verification token');
+      console.error('Invalid verification token. Expected:', KOFI_VERIFICATION_TOKEN, 'Got:', kofiData.verification_token);
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
