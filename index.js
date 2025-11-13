@@ -3,6 +3,7 @@ import addonSDK from 'stremio-addon-sdk';
 import { fetchMovieLeaks } from './reddit.js';
 import { getMovieByImdbId } from './cinemeta.js';
 import { getRPDBPosterUrl } from './rpdb.js';
+import { validateCode } from './supporters.js';
 
 const { serveHTTP } = addonSDK;
 
@@ -17,9 +18,9 @@ const cacheTimestamp = {};
 // Addon manifest
 const manifest = {
   id: 'community.movieleaks',
-  version: '1.3.2',
+  version: '1.4.0',
   name: 'Movie Leaks Catalog',
-  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit with RPDB poster support\n\n━━━━━━━━━━━━━━━━━━\n☕ Buy me a coffee to keep this running!\n👉 https://ko-fi.com/zeroq\n\n🎬 Updated daily\n⚡ Server costs + development time need YOUR support!\n\n━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
+  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🆓 FREE TIER: 100 movies\n💎 SUPPORTER TIER: All 477+ movies\n🎨 RPDB: Optional (supporters bring their own key)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n☕ Become a Supporter ($5/month):\n👉 https://ko-fi.com/zeroq/membership\n\nAfter subscribing, enter your code below to unlock!\n\nOptional: Add your RPDB key for enhanced posters\nGet free key at: ratingposterdb.com\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
@@ -49,9 +50,16 @@ const manifest = {
   },
   config: [
     {
+      key: 'supporter_code',
+      type: 'text',
+      title: '💎 Supporter Code (Unlock all Movies)',
+      required: false,
+      default: ''
+    },
+    {
       key: 'rpdb_api_key',
       type: 'text',
-      title: 'RPDB API Key (optional - for poster overlays)',
+      title: '🎨 RPDB API Key (Optional - Supporters only: Get posters with RT scores)',
       required: false,
       default: ''
     }
@@ -68,8 +76,21 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
   const sort = extra?.sort || 'new'; // Default to 'new' if not specified
   const PAGE_SIZE = 100; // Stremio's default catalog page size
+  const supporterCode = config?.supporter_code || '';
   const rpdbApiKey = config?.rpdb_api_key || '';
-  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, sort=${sort}, RPDB API: ${rpdbApiKey ? 'configured' : 'not configured'}`);
+  
+  // Validate supporter code
+  const validation = await validateCode(supporterCode);
+  const isSupporter = validation.valid;
+  const FREE_TIER_LIMIT = 100;
+  
+  // RPDB only works for supporters
+  const canUseRPDB = isSupporter && rpdbApiKey;
+  if (rpdbApiKey && !isSupporter) {
+    console.log(`⚠️  RPDB key provided but no valid supporter code - RPDB disabled`);
+  }
+  
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, sort=${sort}, Supporter: ${isSupporter ? 'YES' : 'NO'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
     return { metas: [] };
@@ -80,12 +101,17 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const cacheKey = sort;
   if (catalogCache[cacheKey] && cacheTimestamp[cacheKey] && (now - cacheTimestamp[cacheKey]) < CACHE_DURATION) {
     console.log(`Returning cached catalog for sort=${sort} (${catalogCache[cacheKey].length} total items, skip=${skip})`);
-    // Return paginated slice from cache, but apply RPDB posters if configured
-    let paginatedMetas = catalogCache[cacheKey].slice(skip, skip + PAGE_SIZE);
     
-    // Apply RPDB posters if API key is configured
-    if (rpdbApiKey) {
-      console.log(`Applying RPDB posters to cached results`);
+    // Apply tier limits
+    const tierLimit = isSupporter ? catalogCache[cacheKey].length : FREE_TIER_LIMIT;
+    const availableMetas = catalogCache[cacheKey].slice(0, tierLimit);
+    
+    // Return paginated slice from cache
+    let paginatedMetas = availableMetas.slice(skip, skip + PAGE_SIZE);
+    
+    // Apply RPDB posters only if supporter with valid key
+    if (canUseRPDB) {
+      console.log(`Applying RPDB posters for supporter (user provided key)`);
       paginatedMetas = paginatedMetas.map(meta => {
         // Only apply RPDB if movie has IMDb ID
         if (meta.id && meta.id.startsWith('tt')) {
@@ -98,7 +124,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       });
     }
     
-    console.log(`Returning ${paginatedMetas.length} items from position ${skip}`);
+    console.log(`Returning ${paginatedMetas.length} items from position ${skip} (Tier: ${isSupporter ? 'Supporter' : 'Free'}, Limit: ${tierLimit}, RPDB: ${rpdbApiKey ? 'Enabled' : 'Disabled'})`);
     return { metas: paginatedMetas };
   }
 
@@ -152,9 +178,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       type: 'movie',
       name: cinemataData?.name || movie.title,
       releaseInfo: cinemataData?.releaseInfo || movie.year,
-      poster: rpdbApiKey && movie.imdbId 
-        ? (getRPDBPosterUrl(movie.imdbId, rpdbApiKey) || cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster')
-        : (cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster'),
+      poster: cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster',
       posterShape: 'poster',
       background: cinemataData?.background,
       logo: cinemataData?.logo,
@@ -191,10 +215,29 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
 
   console.log(`Catalog updated with ${metas.length} movies total`);
   
-  // Return paginated slice
-  const paginatedMetas = metas.slice(skip, skip + PAGE_SIZE);
+  // Apply tier limits
+  const tierLimit = isSupporter ? metas.length : FREE_TIER_LIMIT;
+  const availableMetas = metas.slice(0, tierLimit);
   
-  console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, totalAvailable=${metas.length}`);
+  // Apply RPDB posters only if supporter with valid key
+  let finalMetas = availableMetas;
+  if (canUseRPDB) {
+    console.log(`Applying RPDB posters for supporter (user provided key)`);
+    finalMetas = availableMetas.map(meta => {
+      if (meta.id && meta.id.startsWith('tt')) {
+        const rpdbPoster = getRPDBPosterUrl(meta.id, rpdbApiKey);
+        if (rpdbPoster) {
+          return { ...meta, poster: rpdbPoster };
+        }
+      }
+      return meta;
+    });
+  }
+  
+  // Return paginated slice
+  const paginatedMetas = finalMetas.slice(skip, skip + PAGE_SIZE);
+  
+  console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, tierLimit=${tierLimit} (${isSupporter ? 'Supporter' : 'Free'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'})`);
   
   // If we have no more items to return, return empty array
   // Otherwise Stremio will keep requesting
@@ -209,10 +252,17 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
  * Meta handler - returns detailed info for a specific movie
  */
 builder.defineMetaHandler(async ({ type, id, config }) => {
+  const supporterCode = config?.supporter_code || '';
   const rpdbApiKey = config?.rpdb_api_key || '';
   
-  console.log(`Meta request for ${id}`);
-  console.log(`RPDB key: ${rpdbApiKey ? 'YES' : 'NO'}`);
+  // Validate supporter code
+  const validation = await validateCode(supporterCode);
+  const isSupporter = validation.valid;
+  
+  // RPDB only works for supporters
+  const canUseRPDB = isSupporter && rpdbApiKey;
+  
+  console.log(`Meta request for ${id} (Supporter: ${isSupporter ? 'YES' : 'NO'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'})`);
   
   if (type !== 'movie') {
     return { meta: null };
@@ -240,25 +290,12 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
     return { meta: null };
   }
 
-  // Apply RPDB poster if configured
-  if (meta && rpdbApiKey && id.startsWith('tt')) {
+  // Apply RPDB poster only if supporter with valid key
+  if (meta && canUseRPDB && id.startsWith('tt')) {
     const rpdbPoster = getRPDBPosterUrl(id, rpdbApiKey);
     if (rpdbPoster) {
       meta.poster = rpdbPoster;
-      console.log(`Applied RPDB poster for ${id}`);
-    }
-  }
-
-  // Update catalogCache with enriched metadata (RPDB poster) - update in all caches
-  if (meta && id.startsWith('tt') && rpdbApiKey) {
-    for (const sortKey in catalogCache) {
-      if (catalogCache[sortKey]) {
-        const cacheIndex = catalogCache[sortKey].findIndex(m => m.id === id);
-        if (cacheIndex !== -1) {
-          catalogCache[sortKey][cacheIndex] = meta;
-          console.log(`Updated cache for ${id} with RPDB poster in sort=${sortKey}`);
-        }
-      }
+      console.log(`Applied RPDB poster for ${id} (supporter with RPDB key)`);
     }
   }
 

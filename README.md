@@ -2,15 +2,27 @@
 
 A Stremio addon that catalogs leaked and upcoming movies from the r/movieleaks subreddit. This addon automatically fetches the latest posts from the subreddit, parses movie information, and presents them as a browsable catalog in Stremio.
 
+## 🆓 Free Tier vs 💎 Supporter Tier
+
+| Feature | Free Tier | Supporter Tier ($5/month) |
+|---------|-----------|---------------------------|
+| Movies | 100 latest | All Movies |
+| Posters | Standard | RPDB with RT scores |
+| Sort Options | ✅ All 4 | ✅ All 4 |
+| Updates | ✅ Daily | ⚡ Priority |
+| Support | Community | ⚡ Priority |
+
+**[Become a Supporter →](https://ko-fi.com/zeroq/membership)**
+
 ## Features
 
 - 📺 **Automatic Catalog**: Fetches latest movie posts from r/movieleaks
 - 🎬 **Movie Parsing**: Extracts movie titles, years, IMDb links, and posters from Reddit posts
 - 🖼️ **Rich Metadata**: Uses Cinemeta (Stremio's official metadata addon) for high-quality posters, genres, descriptions, cast, and IMDb ratings
-- ⭐ **RPDB Integration**: Optional support for RatingPosterDB - get posters with Rotten Tomatoes scores overlaid!
+- 💎 **Supporter Benefits**: Unlock all Movies + RPDB posters with Rotten Tomatoes scores
+- 🔀 **4 Sort Options**: New, Hot, Top, Rising (just like Reddit)
 - ⚡ **Caching**: 5-minute cache to reduce API calls and improve performance
 - 🔗 **Links**: Direct links to Reddit posts and IMDb pages for each movie
-- 🔑 **No API Keys Required**: Works out of the box, RPDB is optional
 
 ## Installation
 
@@ -43,12 +55,44 @@ A Stremio addon that catalogs leaked and upcoming movies from the r/movieleaks s
    - Go to Addons (puzzle icon in top right)
    - Paste this URL in the search box: `http://localhost:7000/manifest.json`
    - Click Install
-   - **Optional**: Configure RPDB API key for posters with Rotten Tomatoes scores (see Configuration below)
-   - Browse the "Movie Leaks" catalog in the Discover section
+   - Browse the "Movie Leaks" catalog in the Discover section (Free: 100 movies)
+
+## 💎 Unlock Full Access (Supporter Tier)
+
+### Why Support?
+
+Running this addon costs real money:
+- ☁️ Server hosting fees
+- 💾 Storage and bandwidth
+- ⏰ Development and maintenance time
+- 🐛 Bug fixes and new features
+
+**Your support keeps this project alive!**
+
+### How to Become a Supporter
+
+1. **Subscribe on Ko-fi**: Visit [ko-fi.com/zeroq/membership](https://ko-fi.com/zeroq/membership)
+2. **Choose "Movie Leaks Supporter" tier**: $5/month
+3. **Receive Your Code**: You'll get a unique supporter code via email
+4. **Enter Code in Stremio**:
+   - Open Stremio → Addons → Movie Leaks Catalog
+   - Click the ⚙️ settings icon
+   - Enter your supporter code in "Supporter Code" field
+   - Reinstall the addon
+
+### What You Get
+
+✨ **All 477+ movies** (vs 100 free)  
+🎨 **RPDB posters** with Rotten Tomatoes scores  
+⚡ **Priority updates** and support  
+🚀 **Future premium features** as they're added  
+❤️ **Support indie development**
 
 ## Configuration
 
-### RPDB (RatingPosterDB) - Optional
+### For Developers: RPDB Setup
+
+If you're self-hosting and want RPDB posters for supporters:
 
 Want posters with Rotten Tomatoes scores overlaid? Follow these steps:
 
