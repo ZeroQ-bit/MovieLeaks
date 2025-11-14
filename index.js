@@ -1,6 +1,6 @@
 import { addonBuilder } from 'stremio-addon-sdk';
 import addonSDK from 'stremio-addon-sdk';
-import { fetchMovieLeaks } from './reddit.js';
+import { fetchMovies } from './rlsbb.js';
 import { getMovieByImdbId } from './cinemeta.js';
 import { getRPDBPosterUrl } from './rpdb.js';
 import { validateCode } from './supporters.js';
@@ -128,15 +128,13 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     return { metas: paginatedMetas };
   }
 
-  console.log(`Fetching fresh data from Reddit with sort=${sort}...`);
+  console.log(`Fetching fresh data from rlsbb.ru...`);
   
-  // Fetch movies from Reddit (JSON API supports pagination)
-  // Calculate how many posts we need based on skip value
-  // Reddit has ~300-500 recent posts, so fetch enough to cover pagination
-  const neededPosts = Math.max(500, skip + PAGE_SIZE + 200);
-  console.log(`Fetching ${neededPosts} posts to cover skip=${skip}`);
+  // Fetch movies from rlsbb.ru
+  const neededPosts = 500; // rlsbb homepage has limited posts
+  console.log(`Fetching up to ${neededPosts} posts`);
   
-  const movies = await fetchMovieLeaks(neededPosts, sort);
+  const movies = await fetchMovies(neededPosts);
   
   // Remove duplicates based on IMDb ID or slug
   const uniqueMovies = [];

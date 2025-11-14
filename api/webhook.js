@@ -113,7 +113,7 @@ async function sendCodeEmail(email, name, code, isRenewal = false) {
             <h3>🌟 What You Get:</h3>
             <ul>
               <li>✅ <strong>477+ leaked movies</strong> (vs 100 free tier)</li>
-              <li>✅ New movies added weekly from r/movieleaks</li>
+              <li>✅ New HD movie releases added daily from rlsbb.to</li>
               <li>✅ Optional RPDB poster overlays (bring your own key)</li>
               <li>✅ Support ongoing development & hosting</li>
             </ul>

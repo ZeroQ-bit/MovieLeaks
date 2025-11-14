@@ -1,7 +1,7 @@
 {
   "name": "movieleaks-stremio-addon",
   "version": "1.0.0",
-  "description": "Stremio addon that catalogs leaked movies from r/movieleaks subreddit",
+  "description": "Stremio addon that catalogs HD movie releases from rlsbb.to",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -12,8 +12,8 @@
     "stremio",
     "addon",
     "movies",
-    "reddit",
-    "movieleaks"
+    "rlsbb",
+    "releases"
   ],
   "author": "",
   "license": "MIT",
@@ -22,6 +22,7 @@
     "npm": ">=9.x"
   },
   "dependencies": {
+    "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.10",

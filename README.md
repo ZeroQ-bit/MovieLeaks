@@ -1,6 +1,6 @@
 # Movie Leaks - Stremio Addon
 
-A Stremio addon that catalogs leaked and upcoming movies from the r/movieleaks subreddit. This addon automatically fetches the latest posts from the subreddit, parses movie information, and presents them as a browsable catalog in Stremio.
+A Stremio addon that catalogs HD movie releases from rlsbb.to. This addon automatically fetches the latest movies from the recommended widget, retrieves IMDB IDs, and presents them as a browsable catalog in Stremio.
 
 ## 🆓 Free Tier vs 💎 Supporter Tier
 
@@ -112,7 +112,7 @@ Want posters with Rotten Tomatoes scores overlaid? Follow these steps:
    - Find "Movie Leaks Catalog"
    - Click the gear icon to update your RPDB API key
 
-**Note**: Without an RPDB key, the addon still works great using regular posters from Cinemeta and Reddit.
+**Note**: Without an RPDB key, the addon still works great using regular posters from Cinemeta.
 
 ### Environment Variables
 
@@ -125,16 +125,11 @@ PORT=7000
 
 ### How It Works
 
-1. **Reddit Scraping**: The addon uses Reddit's public JSON API (`https://www.reddit.com/r/movieleaks/new.json`) to fetch the latest posts
-2. **Parsing**: Extracts movie titles, years, IMDb IDs, and available images from post titles and content
-3. **Enrichment**: For movies with IMDb IDs, fetches complete metadata from Cinemeta (Stremio's official metadata service) including:
-   - High-quality posters and backgrounds
-   - Full descriptions and plot summaries
-   - Genres, director, and cast information
-   - IMDb ratings and awards
-   - Runtime and release information
-4. **RPDB Enhancement** (Optional): If configured, posters are enhanced with Rotten Tomatoes score overlays from RatingPosterDB
-5. **Caching**: Results are cached for 5 minutes to reduce load on Reddit and Cinemeta APIs
+1. **rlsbb.to Scraping**: The addon scrapes the "Recommended movies" widget from rlsbb.to homepage
+2. **IMDB Extraction**: Fetches IMDB IDs from each movie's detail page (in parallel batches of 10)
+3. **Cinemeta Lookup**: Uses Stremio's Cinemeta to fetch full metadata (plot, cast, posters, etc.) using IMDB IDs
+4. **RPDB Enhancement** (optional): Fetches high-quality posters from RatingPosterDB if configured
+5. **Caching**: Results are cached for 5 minutes to reduce load on rlsbb.to and Cinemeta APIs
 6. **Serving**: Presents data through Stremio's addon protocol
 
 ## Project Structure
@@ -142,7 +137,7 @@ PORT=7000
 ```
 MovieLeaks/
 ├── index.js          # Main addon server and handlers
-├── reddit.js         # Reddit API client and parser
+├── rlsbb.js          # rlsbb.to scraper and IMDB fetcher
 ├── cinemeta.js       # Cinemeta API integration
 ├── rpdb.js           # RatingPosterDB integration
 ├── package.json      # Dependencies and scripts
@@ -155,7 +150,7 @@ MovieLeaks/
 Once running, the addon exposes these endpoints:
 
 - `GET /manifest.json` - Addon manifest (used by Stremio to install)
-- `GET /catalog/movie/movieleaks.json` - List of movies from r/movieleaks
+- `GET /catalog/movie/movieleaks.json` - List of movies from rlsbb.to
 - `GET /meta/movie/:id.json` - Detailed metadata for a specific movie
 
 ## Deployment

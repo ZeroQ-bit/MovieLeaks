@@ -109,7 +109,7 @@ Users paste it in Stremio → Addons → Install from URL
 
 ## 📊 Your Addon Features
 
-✅ r/movieleaks catalog integration
+✅ rlsbb.to catalog integration
 ✅ Cinemeta metadata enrichment
 ✅ RPDB poster support (optional)
 ✅ 5-minute caching
