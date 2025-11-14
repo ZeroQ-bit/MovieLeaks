@@ -28,13 +28,13 @@ const manifest = {
     {
       type: 'movie',
       id: 'movieleaks',
-      name: 'Latest Leaks',
+      name: 'Latest Releases',
       posterShape: 'poster',
       extra: [
         {
-          name: 'sort',
+          name: 'genre',
           isRequired: false,
-          options: ['new', 'hot', 'top', 'rising'],
+          options: ['Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Music', 'Mystery', 'Romance', 'Science Fiction', 'Thriller', 'War', 'Western'],
           optionsLimit: 1
         },
         {
@@ -74,7 +74,7 @@ const builder = new addonBuilder(manifest);
  */
 builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
-  const sort = extra?.sort || 'new'; // Default to 'new' if not specified
+  const genre = extra?.genre || null;
   const PAGE_SIZE = 100; // Stremio's default catalog page size
   const supporterCode = config?.supporter_code || '';
   const rpdbApiKey = config?.rpdb_api_key || '';
@@ -82,7 +82,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   // Validate supporter code
   const validation = await validateCode(supporterCode);
   const isSupporter = validation.valid;
-  const FREE_TIER_LIMIT = 100;
+  const FREE_TIER_LIMIT = 70;
   
   // RPDB only works for supporters
   const canUseRPDB = isSupporter && rpdbApiKey;
@@ -90,21 +90,30 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     console.log(`⚠️  RPDB key provided but no valid supporter code - RPDB disabled`);
   }
   
-  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, sort=${sort}, Supporter: ${isSupporter ? 'YES' : 'NO'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'}`);
+  console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, genre=${genre || 'all'}, Supporter: ${isSupporter ? 'YES' : 'NO'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'}`);
   
   if (type !== 'movie' || id !== 'movieleaks') {
     return { metas: [] };
   }
 
-  // Check cache for this specific sort
+  // Check cache
   const now = Date.now();
-  const cacheKey = sort;
+  const cacheKey = 'all';
   if (catalogCache[cacheKey] && cacheTimestamp[cacheKey] && (now - cacheTimestamp[cacheKey]) < CACHE_DURATION) {
-    console.log(`Returning cached catalog for sort=${sort} (${catalogCache[cacheKey].length} total items, skip=${skip})`);
+    console.log(`Returning cached catalog (${catalogCache[cacheKey].length} total items, skip=${skip})`);
+    
+    // Filter by genre if specified
+    let filteredMetas = catalogCache[cacheKey];
+    if (genre) {
+      filteredMetas = catalogCache[cacheKey].filter(meta => 
+        meta.genres && meta.genres.includes(genre)
+      );
+      console.log(`Filtered to ${filteredMetas.length} movies in genre: ${genre}`);
+    }
     
     // Apply tier limits
-    const tierLimit = isSupporter ? catalogCache[cacheKey].length : FREE_TIER_LIMIT;
-    const availableMetas = catalogCache[cacheKey].slice(0, tierLimit);
+    const tierLimit = isSupporter ? filteredMetas.length : FREE_TIER_LIMIT;
+    const availableMetas = filteredMetas.slice(0, tierLimit);
     
     // Return paginated slice from cache
     let paginatedMetas = availableMetas.slice(skip, skip + PAGE_SIZE);
