@@ -1,14 +1,13 @@
 # Movie Leaks - Stremio Addon
 
-A Stremio addon that catalogs HD movie releases from rlsbb.to. This addon automatically fetches the latest movies from the recommended widget, retrieves IMDB IDs, and presents them as a browsable catalog in Stremio.
+A Stremio addon that catalogs HD movie releases from rlsbb.to. Automatically fetches the latest movies, retrieves IMDB IDs, and presents them as a browsable catalog in Stremio.
 
 ## 🆓 Free Tier vs 💎 Supporter Tier
 
 | Feature | Free Tier | Supporter Tier ($5/month) |
 |---------|-----------|---------------------------|
-| Movies | 100 latest | All Movies |
-| Posters | Standard | RPDB with RT scores |
-| Sort Options | ✅ All 4 | ✅ All 4 |
+| Movies | 70 latest HD releases | All Movies (~70+) |
+| Posters | Standard Cinemeta | RPDB with RT scores |
 | Updates | ✅ Daily | ⚡ Priority |
 | Support | Community | ⚡ Priority |
 
@@ -16,13 +15,13 @@ A Stremio addon that catalogs HD movie releases from rlsbb.to. This addon automa
 
 ## Features
 
-- 📺 **Automatic Catalog**: Fetches latest movie posts from r/movieleaks
-- 🎬 **Movie Parsing**: Extracts movie titles, years, IMDb links, and posters from Reddit posts
-- 🖼️ **Rich Metadata**: Uses Cinemeta (Stremio's official metadata addon) for high-quality posters, genres, descriptions, cast, and IMDb ratings
-- 💎 **Supporter Benefits**: Unlock all Movies + RPDB posters with Rotten Tomatoes scores
-- 🔀 **4 Sort Options**: New, Hot, Top, Rising (just like Reddit)
-- ⚡ **Caching**: 5-minute cache to reduce API calls and improve performance
-- 🔗 **Links**: Direct links to Reddit posts and IMDb pages for each movie
+- 📺 **HD Movie Catalog**: Fetches latest HD releases from rlsbb.to (1080p, 720p, 4K)
+- 🎬 **IMDB Integration**: Automatically extracts titles, years, and IMDB IDs
+- 🖼️ **Rich Metadata**: Uses Cinemeta for high-quality posters, genres, descriptions, cast, and ratings
+- 💎 **Supporter Benefits**: Unlock all movies + RPDB posters with Rotten Tomatoes scores
+- ⚡ **Fast Loading**: Parallel IMDB fetching in batches of 10
+- 🔄 **Smart Caching**: 5-minute cache to improve performance
+- 🔗 **Direct Links**: Links to release pages and IMDb
 
 ## Installation
 
@@ -82,7 +81,7 @@ Running this addon costs real money:
 
 ### What You Get
 
-✨ **All 477+ movies** (vs 100 free)  
+✨ **All movie releases** (no limits)  
 🎨 **RPDB posters** with Rotten Tomatoes scores  
 ⚡ **Priority updates** and support  
 🚀 **Future premium features** as they're added  
@@ -209,11 +208,11 @@ The addon can also run on:
 
 ## Legal Notice
 
-This addon is a catalog aggregator that displays publicly available information from Reddit. It does not host, link to, or provide any copyrighted content or streams. Users are responsible for complying with their local laws regarding content access.
+This addon is a catalog aggregator that displays publicly available information from rlsbb.to. It does not host, link to, or provide any copyrighted content or streams. Users are responsible for complying with their local laws regarding content access.
 
 The addon:
 - ✅ Displays metadata (titles, descriptions, posters) from public sources
-- ✅ Links to Reddit posts and IMDb pages
+- ✅ Links to release info pages and IMDb
 - ❌ Does NOT provide streams or downloads
 - ❌ Does NOT host any copyrighted content
 
@@ -223,14 +222,15 @@ The addon:
 Make sure you've run `npm install` and are using Node.js 18+
 
 ### No movies showing up
-- Check if Reddit is accessible from your network
+- Check if rlsbb.to is accessible from your network
 - Try running manually: `node index.js` and look for errors
-- Verify the addon is cached by checking console logs
+- First load takes ~10 seconds to fetch all IMDB IDs
+- Check console logs for scraping errors
 
 ### Movies without metadata
-- Only movies with IMDb IDs get full metadata from Cinemeta
-- Reddit posts should include IMDb links for best results
-- Movies without IMDb IDs will show basic info from Reddit
+- All movies should have IMDB IDs from rlsbb.to
+- If metadata is missing, Cinemeta might be down
+- Check if IMDB ID was extracted correctly in logs
 
 ### Addon not installing in Stremio
 - Make sure the server is running (`npm start`)
@@ -247,11 +247,12 @@ To modify the addon:
 
 ### Adding Stream Support
 
-If you want to add actual streaming capability:
+This addon is catalog-only. For streams, install other Stremio addons like:
+- Torrentio
+- MediaFusion
+- Comet
 
-1. Add `"stream"` to the `resources` array in `manifest` (index.js)
-2. Implement a `defineStreamHandler` that returns torrent/stream links
-3. Parse magnet links or streaming URLs from Reddit posts/comments
+The catalog will appear in your Stremio library, and your stream addons will provide links automatically.
 
 ## Bug Reports & Feature Requests
 
@@ -279,8 +280,9 @@ Found a bug or have a feature idea? Please report it!
 ## Credits
 
 - Built with [Stremio Addon SDK](https://github.com/Stremio/stremio-addon-sdk)
-- Data from [r/movieleaks](https://www.reddit.com/r/movieleaks/)
+- Movie releases from [rlsbb.to](https://rlsbb.to/)
 - Metadata from [Cinemeta](https://github.com/Stremio/stremio-addon-sdk) (Stremio's official metadata addon)
+- Posters from [RatingPosterDB](https://ratingposterdb.com/) (optional)
 
 ## License
 
