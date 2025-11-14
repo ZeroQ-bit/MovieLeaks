@@ -17,8 +17,8 @@ const cacheTimestamp = {};
 
 // Addon manifest
 const manifest = {
-  id: 'community.movieleaks.v2',
-  version: '1.4.0',
+  id: 'community.movieleaks.v3',
+  version: '2.0.0',
   name: 'Movie Leaks Catalog',
   description: 'Catalog of HD movie releases\n\n━━━━━━━━━━━━━━━━━━━\n🆓 FREE TIER: 70 movies\n💎 SUPPORTER TIER: All Movies\n🎨 RPDB: Optional (supporters bring their own key)\n━━━━━━━━━━━━━━━━━━━\n\n☕ Become a Supporter ($5/month):\n👉 https://ko-fi.com/zeroq/membership\n\nAfter subscribing, enter your code below to unlock!\n\nOptional: Add your RPDB key for enhanced posters\nGet free key at: ratingposterdb.com\n\n━━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
   logo: 'https://i.imgur.com/hovSkIN.png',
