@@ -20,7 +20,7 @@ const manifest = {
   id: 'community.movieleaks.v2',
   version: '1.4.0',
   name: 'Movie Leaks Catalog',
-  description: 'Catalog of leaked and upcoming movies from r/movieleaks subreddit\n\n━━━━━━━━━━━━━━━━━━━\n🆓 FREE TIER: 100 movies\n💎 SUPPORTER TIER: All Movies\n🎨 RPDB: Optional (supporters bring their own key)\n━━━━━━━━━━━━━━━━━━━\n\n☕ Become a Supporter ($5/month):\n👉 https://ko-fi.com/zeroq/membership\n\nAfter subscribing, enter your code below to unlock!\n\nOptional: Add your RPDB key for enhanced posters\nGet free key at: ratingposterdb.com\n\n━━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
+  description: 'Catalog of HD movie releases\n\n━━━━━━━━━━━━━━━━━━━\n🆓 FREE TIER: 70 movies\n💎 SUPPORTER TIER: All Movies\n🎨 RPDB: Optional (supporters bring their own key)\n━━━━━━━━━━━━━━━━━━━\n\n☕ Become a Supporter ($5/month):\n👉 https://ko-fi.com/zeroq/membership\n\nAfter subscribing, enter your code below to unlock!\n\nOptional: Add your RPDB key for enhanced posters\nGet free key at: ratingposterdb.com\n\n━━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
@@ -70,7 +70,7 @@ const manifest = {
 const builder = new addonBuilder(manifest);
 
 /**
- * Catalog handler - returns list of movies from r/movieleaks
+ * Catalog handler - returns list of HD movies
  */
 builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
@@ -128,10 +128,10 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     return { metas: paginatedMetas };
   }
 
-  console.log(`Fetching fresh data from rlsbb.ru...`);
+  console.log(`Fetching fresh movie data...`);
   
-  // Fetch movies from rlsbb.ru
-  const neededPosts = 500; // rlsbb homepage has limited posts
+  // Fetch movies
+  const neededPosts = 500;
   console.log(`Fetching up to ${neededPosts} posts`);
   
   const movies = await fetchMovies(neededPosts);
@@ -168,7 +168,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     }
 
     // Build description
-    let description = cinemataData?.description || movie.description || `Leaked movie from r/movieleaks\n\nPosted by u/${movie.author} on Reddit.\n\n${movie.redditUrl}`;
+    let description = cinemataData?.description || movie.description || 'HD movie release';
 
     // Build meta object
     const meta = {
@@ -186,13 +186,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       cast: Array.isArray(cinemataData?.cast) ? cinemataData.cast : [],
       imdbRating: cinemataData?.imdbRating,
       runtime: cinemataData?.runtime,
-      links: [
-        {
-          name: 'Reddit Post',
-          category: 'Social',
-          url: movie.redditUrl
-        }
-      ]
+      links: []
     };
 
     // Add IMDb link if available
