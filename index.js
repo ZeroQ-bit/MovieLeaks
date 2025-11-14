@@ -24,6 +24,10 @@ const manifest = {
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
   types: ['movie'],
+  stremioAddonsConfig: {
+    issuer: 'https://stremio-addons.net',
+    signature: 'eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..zlTlArrwEGcRhH15mu0v0g.X_8XIWZEG_nGTh_zBdkUmhKXaR_E8m8UcaBzKDTlVj0AuN-kQPyNzT2BzgqWtfvrVSML4Uo6Zdd9gzv1NIMHe8B5maFTIMetX577u4lrwpJagLVnjUtFY09Uzq3mdBxw.UCTvBwP1JTLeJAUTzZP71Q'
+  },
   catalogs: [
     {
       type: 'movie',
