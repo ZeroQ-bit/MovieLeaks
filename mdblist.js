@@ -1,4 +1,165 @@
 import fetch from 'node-fetch';
+import { parseStringPromise } from 'xml2js';
+
+/**
+ * Fetches series from MDBList RSS feed
+ * MDBList provides curated lists with IMDb IDs
+ * Note: RSS feeds are typically limited to 200-250 items
+ */
+export async function fetchSeriesFromMDBList(feedUrl = 'https://mdblist.com/lists/zeroq/new-releases?rss=9u557z3sb9yiro2r6tqdtdc0n&limit=1000') {
+  console.log('Fetching series from MDBList RSS feed...');
+  
+  try {
+    const response = await fetch(feedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`MDBList RSS fetch error: ${response.status}`);
+      return [];
+    }
+
+    const xmlText = await response.text();
+    const result = await parseStringPromise(xmlText);
+    
+    if (!result.rss || !result.rss.channel || !result.rss.channel[0].item) {
+      console.error('Invalid RSS structure');
+      return [];
+    }
+
+    const items = result.rss.channel[0].item;
+    const series = [];
+    
+    for (const item of items) {
+      try {
+        // Extract basic info
+        const title = item.title?.[0] || '';
+        const link = item.link?.[0] || '';
+        const description = item.description?.[0] || '';
+        
+        // Only process TV shows (not movies)
+        if (!link.includes('/show/')) continue;
+        
+        // Extract year from title (e.g., "Title (2025)")
+        const yearMatch = title.match(/\((\d{4})\)/);
+        const year = yearMatch ? yearMatch[1] : new Date().getFullYear().toString();
+        
+        // Clean title (remove year)
+        const cleanTitle = title.replace(/\s*\(\d{4}\)/, '').trim();
+        
+        // Extract IMDb ID from description
+        const imdbMatch = description.match(/imdb\.com\/title\/(tt\d+)/);
+        if (!imdbMatch) continue; // Skip if no IMDb ID
+        
+        const imdbId = imdbMatch[1];
+        
+        // Extract MDBList ID from link
+        const mdbIdMatch = link.match(/show\/(tt\d+)/);
+        const mdbId = mdbIdMatch ? mdbIdMatch[1] : imdbId;
+        
+        series.push({
+          id: `mdblist-${mdbId}`,
+          title: cleanTitle,
+          year: year,
+          imdbId: imdbId,
+          source: 'mdblist'
+        });
+        
+      } catch (error) {
+        console.error('Error parsing MDBList item:', error.message);
+      }
+    }
+    
+    console.log(`Found ${series.length} TV shows from MDBList`);
+    return series;
+    
+  } catch (error) {
+    console.error('MDBList fetch error:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Fetches movies from MDBList RSS feed
+ * MDBList provides curated lists with IMDb IDs
+ * Note: RSS feeds are typically limited to 200-250 items
+ */
+export async function fetchMoviesFromMDBList(feedUrl = 'https://mdblist.com/lists/zeroq/new-releases?rss=9u557z3sb9yiro2r6tqdtdc0n&limit=1000') {
+  console.log('Fetching movies from MDBList RSS feed...');
+  
+  try {
+    const response = await fetch(feedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`MDBList RSS fetch error: ${response.status}`);
+      return [];
+    }
+
+    const xmlText = await response.text();
+    const result = await parseStringPromise(xmlText);
+    
+    if (!result.rss || !result.rss.channel || !result.rss.channel[0].item) {
+      console.error('Invalid RSS structure');
+      return [];
+    }
+
+    const items = result.rss.channel[0].item;
+    const movies = [];
+    
+    for (const item of items) {
+      try {
+        // Extract basic info
+        const title = item.title?.[0] || '';
+        const link = item.link?.[0] || '';
+        const description = item.description?.[0] || '';
+        
+        // Only process movies (not TV shows)
+        if (!link.includes('/movie/')) continue;
+        
+        // Extract year from title (e.g., "Title (2025)")
+        const yearMatch = title.match(/\((\d{4})\)/);
+        const year = yearMatch ? yearMatch[1] : new Date().getFullYear().toString();
+        
+        // Clean title (remove year)
+        const cleanTitle = title.replace(/\s*\(\d{4}\)/, '').trim();
+        
+        // Extract IMDb ID from description
+        const imdbMatch = description.match(/imdb\.com\/title\/(tt\d+)/);
+        if (!imdbMatch) continue; // Skip if no IMDb ID
+        
+        const imdbId = imdbMatch[1];
+        
+        // Extract MDBList ID from link
+        const mdbIdMatch = link.match(/movie\/(tt\d+)/);
+        const mdbId = mdbIdMatch ? mdbIdMatch[1] : imdbId;
+        
+        movies.push({
+          id: `mdblist-${mdbId}`,
+          title: cleanTitle,
+          year: year,
+          imdbId: imdbId,
+          source: 'mdblist'
+        });
+        
+      } catch (error) {
+        console.error('Error parsing MDBList item:', error.message);
+      }
+    }
+    
+    console.log(`Found ${movies.length} movies from MDBList`);
+    return movies;
+    
+  } catch (error) {
+    console.error('MDBList fetch error:', error.message);
+    return [];
+  }
+}
 
 /**
  * Fetches ratings from MDBList API

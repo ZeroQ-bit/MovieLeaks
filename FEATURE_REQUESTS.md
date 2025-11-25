@@ -4,16 +4,6 @@
 
 ### High Priority
 
-#### 1. Subreddit Selection Fields
-- Allow users to configure which subreddits to scrape
-- Add multiple subreddit support via config screen
-- Potential subreddits:
-  - r/movieleaks (current)
-  - r/FullMoviesOnline
-  - r/fullmoviesonyoutube
-  - r/fullmovierequest
-  - Custom subreddit input
-
 **Implementation:**
 - Add multi-select or text input field in config
 - Modify reddit.js to accept subreddit parameter

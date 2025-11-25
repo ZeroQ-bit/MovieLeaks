@@ -1,7 +1,9 @@
 import { addonBuilder } from 'stremio-addon-sdk';
 import addonSDK from 'stremio-addon-sdk';
 import { fetchMovies } from './rlsbb.js';
-import { getMovieByImdbId } from './cinemeta.js';
+import { fetchMoviesFromReddit } from './reddit.js';
+import { fetchSeriesFromMDBList, fetchMoviesFromMDBList } from './mdblist.js';
+import { getMovieByImdbId, getSeriesByImdbId } from './cinemeta.js';
 import { getRPDBPosterUrl } from './rpdb.js';
 import { validateCode } from './supporters.js';
 
@@ -14,16 +16,18 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 // Simple in-memory cache - separate cache for each sort type
 const catalogCache = {};
 const cacheTimestamp = {};
+const seriesCatalogCache = {};
+const seriesCacheTimestamp = {};
 
 // Addon manifest
 const manifest = {
   id: 'community.movieleaks.v3',
-  version: '2.0.0',
+  version: '2.5.0',
   name: 'Movie Leaks Catalog',
-  description: 'Catalog of HD movie releases\n\n━━━━━━━━━━━━━━━━━━━\n🆓 FREE TIER: 70 movies\n💎 SUPPORTER TIER: All Movies\n🎨 RPDB: Optional (supporters bring their own key)\n━━━━━━━━━━━━━━━━━━━\n\n☕ Become a Supporter ($5/month):\n👉 https://ko-fi.com/zeroq/membership\n\nAfter subscribing, enter your code below to unlock!\n\nOptional: Add your RPDB key for enhanced posters\nGet free key at: ratingposterdb.com\n\n━━━━━━━━━━━━━━━━━━━\n🐛 Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
+  description: 'HD Movies & Series - Latest Releases. Report bugs: https://github.com/Zerr0-C00L/MovieLeaks-Issues/issues',
   logo: 'https://i.imgur.com/hovSkIN.png',
   resources: ['catalog', 'meta'],
-  types: ['movie'],
+  types: ['movie', 'series'],
   stremioAddonsConfig: {
     issuer: 'https://stremio-addons.net',
     signature: 'eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..zlTlArrwEGcRhH15mu0v0g.X_8XIWZEG_nGTh_zBdkUmhKXaR_E8m8UcaBzKDTlVj0AuN-kQPyNzT2BzgqWtfvrVSML4Uo6Zdd9gzv1NIMHe8B5maFTIMetX577u4lrwpJagLVnjUtFY09Uzq3mdBxw.UCTvBwP1JTLeJAUTzZP71Q'
@@ -46,20 +50,38 @@ const manifest = {
           isRequired: false
         }
       ]
+    },
+    {
+      type: 'series',
+      id: 'seriesleaks',
+      name: 'Latest Series',
+      posterShape: 'poster',
+      extra: [
+        {
+          name: 'genre',
+          isRequired: false,
+          options: ['Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Music', 'Mystery', 'Romance', 'Science Fiction', 'Thriller', 'War', 'Western'],
+          optionsLimit: 1
+        },
+        {
+          name: 'skip',
+          isRequired: false
+        }
+      ]
     }
   ],
   config: [
     {
       key: 'supporter_code',
       type: 'text',
-      title: '💎 Supporter Code (Unlock all Movies)',
+      title: '💎 Supporter Code - Get unlimited access: https://ko-fi.com/summary/c5818b97-d200-406e-abbc-6384d2f58cb7',
       required: false,
       default: ''
     },
     {
       key: 'rpdb_api_key',
       type: 'text',
-      title: '🎨 RPDB API Key (Optional - Supporters only: Get posters with RT scores)',
+      title: '🎨 RPDB API Key (Optional)',
       required: false,
       default: ''
     }
@@ -74,7 +96,189 @@ const manifest = {
 const builder = new addonBuilder(manifest);
 
 /**
- * Catalog handler - returns list of HD movies
+ * Helper function to handle series catalog requests
+ */
+async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbApiKey }) {
+  const PAGE_SIZE = 100;
+  const FREE_TIER_LIMIT = 100;
+  
+  // Check cache
+  const now = Date.now();
+  const cacheKey = 'all';
+  if (seriesCatalogCache[cacheKey] && seriesCacheTimestamp[cacheKey] && (now - seriesCacheTimestamp[cacheKey]) < CACHE_DURATION) {
+    console.log(`Returning cached series catalog (${seriesCatalogCache[cacheKey].length} total items, skip=${skip})`);
+    
+    // Filter by genre if specified
+    let filteredMetas = seriesCatalogCache[cacheKey];
+    if (genre) {
+      filteredMetas = seriesCatalogCache[cacheKey].filter(meta => 
+        meta.genres && meta.genres.includes(genre)
+      );
+      console.log(`Filtered to ${filteredMetas.length} series in genre: ${genre}`);
+    }
+    
+    // Apply tier limits
+    const tierLimit = isSupporter ? filteredMetas.length : FREE_TIER_LIMIT;
+    const availableMetas = filteredMetas.slice(0, tierLimit);
+    
+    // Return paginated slice from cache
+    let paginatedMetas = availableMetas.slice(skip, skip + PAGE_SIZE);
+    
+    // Apply RPDB posters only if supporter with valid key
+    if (canUseRPDB) {
+      console.log(`Applying RPDB posters for series (supporter with user provided key)`);
+      paginatedMetas = paginatedMetas.map(meta => {
+        if (meta.id && meta.id.startsWith('tt')) {
+          const rpdbPoster = getRPDBPosterUrl(meta.id, rpdbApiKey);
+          if (rpdbPoster) {
+            return { ...meta, poster: rpdbPoster };
+          }
+        }
+        return meta;
+      });
+    }
+    
+    console.log(`Returning ${paginatedMetas.length} series from position ${skip} (Tier: ${isSupporter ? 'Supporter' : 'Free'}, Limit: ${tierLimit})`);
+    return { metas: paginatedMetas };
+  }
+
+  console.log(`Fetching fresh series data...`);
+  
+  // Fetch from MDBList RSS feed
+  const mdblistSeries = await fetchSeriesFromMDBList();
+  
+  console.log(`Fetched ${mdblistSeries.length} from MDBList`);
+  
+  // Use MDBList as the only source
+  const series = mdblistSeries;
+  
+  // Remove duplicates based on IMDb ID
+  const uniqueSeries = [];
+  const seenIds = new Set();
+  for (const show of series) {
+    const id = show.imdbId || show.id;
+    if (id && !seenIds.has(id)) {
+      seenIds.add(id);
+      uniqueSeries.push(show);
+    }
+  }
+  
+  console.log(`Fetched ${series.length} posts, ${uniqueSeries.length} unique series`);
+  
+  // Enrich with Cinemeta metadata
+  const metas = (await Promise.all(uniqueSeries.map(async (show) => {
+    let cinemataData = null;
+
+    // Try to fetch from Cinemeta if we have an IMDb ID
+    if (show.imdbId) {
+      try {
+        cinemataData = await getSeriesByImdbId(show.imdbId);
+        if (!cinemataData) {
+          console.log(`No Cinemeta data for ${show.title} (${show.imdbId}) - using fallback`);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch Cinemeta data for ${show.imdbId}:`, error.message);
+      }
+    }
+
+    // Skip series without IMDb ID
+    if (!show.imdbId) {
+      console.log(`Skipping series without IMDb ID: ${show.title}`);
+      return null;
+    }
+
+    // Build description - prefer Cinemeta but fallback to basic info
+    let description = cinemataData?.description || `${show.title} - New series from ${show.year}. Season 1 available on rlsbb.to.`;
+    
+    // Add episode info if available
+    if (show.episodeCount) {
+      description += ` • ${show.episodeCount} episode${show.episodeCount > 1 ? 's' : ''} available`;
+    }
+
+    // Build meta object
+    const meta = {
+      id: show.imdbId || `ml-${show.id}`,
+      type: 'series',
+      name: cinemataData?.name || show.title,
+      releaseInfo: cinemataData?.releaseInfo || `${show.year}–`,
+      poster: cinemataData?.poster || `https://via.placeholder.com/300x450/2c2c2c/ffffff?text=${encodeURIComponent(show.title)}`,
+      posterShape: 'poster',
+      background: cinemataData?.background,
+      logo: cinemataData?.logo,
+      description: description,
+      genres: Array.isArray(cinemataData?.genres) && cinemataData.genres.length > 0 ? cinemataData.genres : ['Drama'],
+      director: cinemataData?.director || [],
+      cast: Array.isArray(cinemataData?.cast) ? cinemataData.cast : [],
+      imdbRating: cinemataData?.imdbRating,
+      runtime: cinemataData?.runtime,
+      status: cinemataData?.status || 'Continuing',
+      links: [],
+      year: cinemataData?.year || show.year
+    };
+
+    // Filter: Only show series from last 365 days (current year and previous year)
+    const currentYear = new Date().getFullYear();
+    const metaYear = parseInt(meta.year) || currentYear;
+    
+    // Accept current year and previous year (covers last 365 days)
+    if (metaYear < currentYear - 1) {
+      console.log(`Skipping old series: ${meta.name} (${meta.year}) - older than last year`);
+      return null;
+    }
+
+    // Add IMDb link if available
+    if (show.imdbId) {
+      meta.links.push({
+        name: 'IMDb',
+        category: 'Metadata',
+        url: `https://www.imdb.com/title/${show.imdbId}/`
+      });
+    }
+
+    return meta;
+  }))).filter(meta => meta !== null);
+
+  // Keep original order from MDBList RSS feed (already sorted by MDBList)
+
+  // Update cache
+  seriesCatalogCache[cacheKey] = metas;
+  seriesCacheTimestamp[cacheKey] = now;
+
+  console.log(`Series catalog updated with ${metas.length} series total`);
+  
+  // Apply tier limits
+  const tierLimit = isSupporter ? metas.length : FREE_TIER_LIMIT;
+  const availableMetas = metas.slice(0, tierLimit);
+  
+  // Apply RPDB posters only if supporter with valid key
+  let finalMetas = availableMetas;
+  if (canUseRPDB) {
+    console.log(`Applying RPDB posters for series (supporter with user provided key)`);
+    finalMetas = availableMetas.map(meta => {
+      if (meta.id && meta.id.startsWith('tt')) {
+        const rpdbPoster = getRPDBPosterUrl(meta.id, rpdbApiKey);
+        if (rpdbPoster) {
+          return { ...meta, poster: rpdbPoster };
+        }
+      }
+      return meta;
+    });
+  }
+  
+  // Return paginated slice
+  const paginatedMetas = finalMetas.slice(skip, skip + PAGE_SIZE);
+  
+  console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, tierLimit=${tierLimit} (${isSupporter ? 'Supporter' : 'Free'})`);
+  
+  if (paginatedMetas.length === 0) {
+    console.log('No more series available');
+  }
+  
+  return { metas: paginatedMetas };
+}
+
+/**
+ * Catalog handler - returns list of HD movies and series
  */
 builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   const skip = parseInt(extra?.skip || 0);
@@ -86,7 +290,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   // Validate supporter code
   const validation = await validateCode(supporterCode);
   const isSupporter = validation.valid;
-  const FREE_TIER_LIMIT = 70;
+  const FREE_TIER_LIMIT = 100;
   
   // RPDB only works for supporters
   const canUseRPDB = isSupporter && rpdbApiKey;
@@ -96,6 +300,12 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   
   console.log(`Catalog request: type=${type}, id=${id}, skip=${skip}, genre=${genre || 'all'}, Supporter: ${isSupporter ? 'YES' : 'NO'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'}`);
   
+  // Handle series catalog
+  if (type === 'series' && id === 'seriesleaks') {
+    return handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbApiKey });
+  }
+  
+  // Handle movie catalog
   if (type !== 'movie' || id !== 'movieleaks') {
     return { metas: [] };
   }
@@ -143,18 +353,25 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
 
   console.log(`Fetching fresh movie data...`);
   
-  // Fetch movies
-  const neededPosts = 500;
-  console.log(`Fetching up to ${neededPosts} posts`);
+  // Fetch movies from all sources in parallel
+  const [rlsbbMovies, redditMovies, mdblistMovies] = await Promise.all([
+    fetchMovies(500),
+    fetchMoviesFromReddit(100),
+    fetchMoviesFromMDBList()
+  ]);
   
-  const movies = await fetchMovies(neededPosts);
+  console.log(`Fetched ${rlsbbMovies.length} from rlsbb.to, ${redditMovies.length} from r/movieleaks, ${mdblistMovies.length} from MDBList`);
   
-  // Remove duplicates based on IMDb ID or slug
+  // Merge all sources
+  const movies = [...rlsbbMovies, ...redditMovies, ...mdblistMovies];
+  
+  // Remove duplicates based on IMDb ID (use slug as fallback)
   const uniqueMovies = [];
   const seenIds = new Set();
   for (const movie of movies) {
-    if (!seenIds.has(movie.id)) {
-      seenIds.add(movie.id);
+    const uniqueKey = movie.imdbId || movie.id;
+    if (!seenIds.has(uniqueKey)) {
+      seenIds.add(uniqueKey);
       uniqueMovies.push(movie);
     }
   }
@@ -174,9 +391,9 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       }
     }
 
-    // Skip movies without IMDb ID and without poster
-    if (!movie.imdbId && !movie.poster && !movie.thumbnail) {
-      console.log(`Skipping movie without IMDb ID or poster: ${movie.title}`);
+    // Skip movies without IMDb ID (we need IMDb ID for Stremio)
+    if (!movie.imdbId) {
+      console.log(`Skipping movie without IMDb ID: ${movie.title}`);
       return null;
     }
 
@@ -254,7 +471,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
 });
 
 /**
- * Meta handler - returns detailed info for a specific movie
+ * Meta handler - returns detailed info for a specific movie or series
  */
 builder.defineMetaHandler(async ({ type, id, config }) => {
   const supporterCode = config?.supporter_code || '';
@@ -267,27 +484,51 @@ builder.defineMetaHandler(async ({ type, id, config }) => {
   // RPDB only works for supporters
   const canUseRPDB = isSupporter && rpdbApiKey;
   
-  console.log(`Meta request for ${id} (Supporter: ${isSupporter ? 'YES' : 'NO'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'})`);
+  console.log(`Meta request for ${id}, type: ${type} (Supporter: ${isSupporter ? 'YES' : 'NO'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'})`);
   
-  if (type !== 'movie') {
+  if (type !== 'movie' && type !== 'series') {
     return { meta: null };
   }
 
   let meta = null;
 
-  // Try to find in cache first - search all sort caches
+  // Try to find in appropriate cache based on type
   let cached = null;
-  for (const sortKey in catalogCache) {
-    if (catalogCache[sortKey]) {
-      cached = catalogCache[sortKey].find(m => m.id === id);
-      if (cached) break;
+  if (type === 'series') {
+    // Search series cache
+    for (const sortKey in seriesCatalogCache) {
+      if (seriesCatalogCache[sortKey]) {
+        cached = seriesCatalogCache[sortKey].find(m => m.id === id);
+        if (cached) break;
+      }
+    }
+  } else {
+    // Search movie cache
+    for (const sortKey in catalogCache) {
+      if (catalogCache[sortKey]) {
+        cached = catalogCache[sortKey].find(m => m.id === id);
+        if (cached) break;
+      }
     }
   }
   
   if (cached) {
     // Make a deep copy to avoid mutating cache
     meta = JSON.parse(JSON.stringify(cached));
-    console.log(`Found ${id} in cache`);
+    console.log(`Found ${id} in ${type} cache`);
+    
+    // For series, fetch full metadata with videos (episodes)
+    if (type === 'series' && id.startsWith('tt')) {
+      try {
+        const fullSeriesData = await getSeriesByImdbId(id);
+        if (fullSeriesData && fullSeriesData.videos) {
+          meta.videos = fullSeriesData.videos;
+          console.log(`Added ${fullSeriesData.videos.length} episodes to series metadata`);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch full series data for ${id}:`, error.message);
+      }
+    }
   } else {
     // Not in our catalog - don't provide metadata
     // Let Cinemeta handle it to avoid conflicts
