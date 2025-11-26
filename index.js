@@ -182,8 +182,8 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
     }
 
     // Skip series without IMDb ID
-    if (!show.imdbId) {
-      console.log(`Skipping series without IMDb ID: ${show.title}`);
+    if (!show.imdbId || !show.imdbId.startsWith('tt')) {
+      console.log(`Skipping series without valid IMDb ID: ${show.title} (ID: ${show.imdbId})`);
       return null;
     }
 
@@ -197,7 +197,7 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
 
     // Build meta object
     const meta = {
-      id: show.imdbId || `ml-${show.id}`,
+      id: show.imdbId,
       type: 'series',
       name: cinemataData?.name || show.title,
       releaseInfo: cinemataData?.releaseInfo || `${show.year}–`,
@@ -392,8 +392,8 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     }
 
     // Skip movies without IMDb ID (we need IMDb ID for Stremio)
-    if (!movie.imdbId) {
-      console.log(`Skipping movie without IMDb ID: ${movie.title}`);
+    if (!movie.imdbId || !movie.imdbId.startsWith('tt')) {
+      console.log(`Skipping movie without valid IMDb ID: ${movie.title} (ID: ${movie.imdbId})`);
       return null;
     }
 
@@ -402,7 +402,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
 
     // Build meta object
     const meta = {
-      id: movie.imdbId || `ml-${movie.id}`,
+      id: movie.imdbId,
       type: 'movie',
       name: cinemataData?.name || movie.title,
       releaseInfo: cinemataData?.releaseInfo || movie.year,
