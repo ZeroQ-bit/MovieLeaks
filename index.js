@@ -416,6 +416,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       cast: Array.isArray(cinemataData?.cast) ? cinemataData.cast : [],
       imdbRating: cinemataData?.imdbRating,
       runtime: cinemataData?.runtime,
+      year: cinemataData?.year || movie.year,
       links: []
     };
 
