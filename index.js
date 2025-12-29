@@ -12,12 +12,27 @@ const { serveHTTP } = addonSDK;
 // Configuration
 const PORT = process.env.PORT || 7000;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const REQUEST_TIMEOUT = 25000; // 25 seconds - Stremio times out around 30s
 
 // Simple in-memory cache - separate cache for each sort type
 const catalogCache = {};
 const cacheTimestamp = {};
 const seriesCatalogCache = {};
 const seriesCacheTimestamp = {};
+
+// Track if a fetch is in progress to avoid duplicate fetches
+let movieFetchInProgress = false;
+let seriesFetchInProgress = false;
+
+/**
+ * Helper to wrap a promise with a timeout
+ */
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms))
+  ]);
+}
 
 // Addon manifest
 const manifest = {
@@ -105,13 +120,17 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
   // Check cache
   const now = Date.now();
   const cacheKey = 'all';
-  if (seriesCatalogCache[cacheKey] && seriesCacheTimestamp[cacheKey] && (now - seriesCacheTimestamp[cacheKey]) < CACHE_DURATION) {
-    console.log(`Returning cached series catalog (${seriesCatalogCache[cacheKey].length} total items, skip=${skip})`);
+  const hasFreshCache = seriesCatalogCache[cacheKey] && seriesCacheTimestamp[cacheKey] && (now - seriesCacheTimestamp[cacheKey]) < CACHE_DURATION;
+  const hasAnyCache = seriesCatalogCache[cacheKey] && seriesCatalogCache[cacheKey].length > 0;
+  
+  // Helper function to return data from cache
+  const returnFromCache = (cache) => {
+    console.log(`Returning cached series catalog (${cache.length} total items, skip=${skip})`);
     
     // Filter by genre if specified
-    let filteredMetas = seriesCatalogCache[cacheKey];
+    let filteredMetas = cache;
     if (genre) {
-      filteredMetas = seriesCatalogCache[cacheKey].filter(meta => 
+      filteredMetas = cache.filter(meta => 
         meta.genres && meta.genres.includes(genre)
       );
       console.log(`Filtered to ${filteredMetas.length} series in genre: ${genre}`);
@@ -140,14 +159,43 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
     
     console.log(`Returning ${paginatedMetas.length} series from position ${skip} (Tier: ${isSupporter ? 'Supporter' : 'Free'}, Limit: ${tierLimit})`);
     return { metas: paginatedMetas };
+  };
+  
+  // If we have fresh cache, return it immediately
+  if (hasFreshCache) {
+    return returnFromCache(seriesCatalogCache[cacheKey]);
   }
-
+  
+  // If fetch is already in progress and we have stale cache, return stale cache
+  if (seriesFetchInProgress && hasAnyCache) {
+    console.log(`Series fetch in progress, returning stale cache...`);
+    return returnFromCache(seriesCatalogCache[cacheKey]);
+  }
+  
+  seriesFetchInProgress = true;
   console.log(`Fetching fresh series data...`);
   
-  // Fetch from MDBList RSS feed
-  const mdblistSeries = await fetchSeriesFromMDBList();
-  
-  console.log(`Fetched ${mdblistSeries.length} from MDBList`);
+  try {
+    // Fetch from MDBList RSS feed with timeout
+    const fetchPromise = fetchSeriesFromMDBList().catch(err => {
+      console.error('MDBList series fetch error:', err.message);
+      return [];
+    });
+    
+    const mdblistSeries = await withTimeout(fetchPromise, REQUEST_TIMEOUT, null);
+    
+    if (!mdblistSeries) {
+      console.log(`⚠️ Series fetch timed out after ${REQUEST_TIMEOUT}ms`);
+      seriesFetchInProgress = false;
+      
+      if (hasAnyCache) {
+        console.log(`Returning stale series cache due to timeout`);
+        return returnFromCache(seriesCatalogCache[cacheKey]);
+      }
+      return { metas: [] };
+    }
+    
+    console.log(`Fetched ${mdblistSeries.length} from MDBList`);
   
   // Use MDBList as the only source
   const series = mdblistSeries;
@@ -243,6 +291,7 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
   // Update cache
   seriesCatalogCache[cacheKey] = metas;
   seriesCacheTimestamp[cacheKey] = now;
+  seriesFetchInProgress = false;
 
   console.log(`Series catalog updated with ${metas.length} series total`);
   
@@ -275,6 +324,114 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
   }
   
   return { metas: paginatedMetas };
+  
+  } catch (error) {
+    console.error(`Series catalog fetch error:`, error.message);
+    seriesFetchInProgress = false;
+    
+    // Return stale cache if available, otherwise empty
+    if (hasAnyCache) {
+      console.log(`Returning stale series cache due to error`);
+      return returnFromCache(seriesCatalogCache[cacheKey]);
+    }
+    return { metas: [] };
+  }
+}
+
+/**
+ * Helper function to process movies and enrich with Cinemeta metadata
+ */
+async function processMoviesForCatalog(movies, now) {
+  // Remove duplicates based on IMDb ID
+  const uniqueMovies = [];
+  const seenIds = new Set();
+  for (const movie of movies) {
+    const uniqueKey = movie.imdbId || movie.id;
+    if (uniqueKey && !seenIds.has(uniqueKey)) {
+      seenIds.add(uniqueKey);
+      uniqueMovies.push(movie);
+    }
+  }
+  
+  console.log(`Processing ${uniqueMovies.length} unique movies`);
+  
+  // Enrich with Cinemeta metadata (limit concurrent requests)
+  const metas = (await Promise.all(uniqueMovies.map(async (movie) => {
+    // Skip movies without IMDb ID
+    if (!movie.imdbId || !movie.imdbId.startsWith('tt')) {
+      return null;
+    }
+    
+    let cinemataData = null;
+    try {
+      cinemataData = await getMovieByImdbId(movie.imdbId);
+    } catch (error) {
+      // Silently continue - we'll use fallback data
+    }
+
+    // Build meta object
+    return {
+      id: movie.imdbId,
+      type: 'movie',
+      name: cinemataData?.name || movie.title,
+      releaseInfo: cinemataData?.releaseInfo || movie.year,
+      poster: cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster',
+      posterShape: 'poster',
+      background: cinemataData?.background,
+      logo: cinemataData?.logo,
+      description: cinemataData?.description || movie.description || 'HD movie release',
+      genres: Array.isArray(cinemataData?.genres) ? cinemataData.genres : [],
+      director: cinemataData?.director,
+      cast: Array.isArray(cinemataData?.cast) ? cinemataData.cast : [],
+      imdbRating: cinemataData?.imdbRating,
+      runtime: cinemataData?.runtime,
+      year: cinemataData?.year || movie.year,
+      links: movie.imdbId ? [{ name: 'IMDb', category: 'Metadata', url: `https://www.imdb.com/title/${movie.imdbId}/` }] : []
+    };
+  }))).filter(meta => meta !== null);
+  
+  return metas;
+}
+
+/**
+ * Background function to fetch additional sources and update cache
+ */
+async function fetchAdditionalSources(cacheKey) {
+  console.log(`Starting background fetch for additional sources...`);
+  
+  try {
+    const [rlsbbMovies, redditMovies] = await Promise.all([
+      fetchMovies(500).catch(err => { console.error('rlsbb background fetch error:', err.message); return []; }),
+      fetchMoviesFromReddit(100).catch(err => { console.error('reddit background fetch error:', err.message); return []; })
+    ]);
+    
+    if (rlsbbMovies.length === 0 && redditMovies.length === 0) {
+      console.log(`No additional movies from background fetch`);
+      return;
+    }
+    
+    console.log(`Background fetch got ${rlsbbMovies.length} from rlsbb, ${redditMovies.length} from reddit`);
+    
+    // Get existing cache
+    const existingMetas = catalogCache[cacheKey] || [];
+    const existingIds = new Set(existingMetas.map(m => m.id));
+    
+    // Merge new movies (avoid duplicates)
+    const newMovies = [...rlsbbMovies, ...redditMovies].filter(m => m.imdbId && !existingIds.has(m.imdbId));
+    
+    if (newMovies.length > 0) {
+      const newMetas = await processMoviesForCatalog(newMovies, Date.now());
+      
+      // Merge and update cache
+      const mergedMetas = [...existingMetas, ...newMetas];
+      catalogCache[cacheKey] = mergedMetas;
+      cacheTimestamp[cacheKey] = Date.now();
+      
+      console.log(`Background fetch added ${newMetas.length} movies, total now: ${mergedMetas.length}`);
+    }
+  } catch (error) {
+    console.error(`Background fetch error:`, error.message);
+  }
 }
 
 /**
@@ -310,16 +467,20 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     return { metas: [] };
   }
 
-  // Check cache
+  // Check cache first - return immediately if we have cached data
   const now = Date.now();
   const cacheKey = 'all';
-  if (catalogCache[cacheKey] && cacheTimestamp[cacheKey] && (now - cacheTimestamp[cacheKey]) < CACHE_DURATION) {
-    console.log(`Returning cached catalog (${catalogCache[cacheKey].length} total items, skip=${skip})`);
+  const hasFreshCache = catalogCache[cacheKey] && cacheTimestamp[cacheKey] && (now - cacheTimestamp[cacheKey]) < CACHE_DURATION;
+  const hasAnyCache = catalogCache[cacheKey] && catalogCache[cacheKey].length > 0;
+  
+  // Helper function to return data from cache
+  const returnFromCache = (cache) => {
+    console.log(`Returning cached catalog (${cache.length} total items, skip=${skip})`);
     
     // Filter by genre if specified
-    let filteredMetas = catalogCache[cacheKey];
+    let filteredMetas = cache;
     if (genre) {
-      filteredMetas = catalogCache[cacheKey].filter(meta => 
+      filteredMetas = cache.filter(meta => 
         meta.genres && meta.genres.includes(genre)
       );
       console.log(`Filtered to ${filteredMetas.length} movies in genre: ${genre}`);
@@ -336,7 +497,6 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     if (canUseRPDB) {
       console.log(`Applying RPDB posters for supporter (user provided key)`);
       paginatedMetas = paginatedMetas.map(meta => {
-        // Only apply RPDB if movie has IMDb ID
         if (meta.id && meta.id.startsWith('tt')) {
           const rpdbPoster = getRPDBPosterUrl(meta.id, rpdbApiKey);
           if (rpdbPoster) {
@@ -347,23 +507,93 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       });
     }
     
-    console.log(`Returning ${paginatedMetas.length} items from position ${skip} (Tier: ${isSupporter ? 'Supporter' : 'Free'}, Limit: ${tierLimit}, RPDB: ${rpdbApiKey ? 'Enabled' : 'Disabled'})`);
+    console.log(`Returning ${paginatedMetas.length} items from position ${skip} (Tier: ${isSupporter ? 'Supporter' : 'Free'}, Limit: ${tierLimit})`);
     return { metas: paginatedMetas };
+  };
+  
+  // If we have fresh cache, return it immediately
+  if (hasFreshCache) {
+    return returnFromCache(catalogCache[cacheKey]);
   }
-
+  
+  // If fetch is already in progress and we have stale cache, return stale cache
+  if (movieFetchInProgress && hasAnyCache) {
+    console.log(`Fetch in progress, returning stale cache...`);
+    return returnFromCache(catalogCache[cacheKey]);
+  }
+  
+  // Start fresh fetch with timeout
+  movieFetchInProgress = true;
   console.log(`Fetching fresh movie data...`);
   
-  // Fetch movies from all sources in parallel
-  const [rlsbbMovies, redditMovies, mdblistMovies] = await Promise.all([
-    fetchMovies(500),
-    fetchMoviesFromReddit(100),
-    fetchMoviesFromMDBList()
-  ]);
-  
-  console.log(`Fetched ${rlsbbMovies.length} from rlsbb.to, ${redditMovies.length} from r/movieleaks, ${mdblistMovies.length} from MDBList`);
-  
-  // Merge all sources
-  const movies = [...rlsbbMovies, ...redditMovies, ...mdblistMovies];
+  try {
+    // First, try to get MDBList (fastest source - already has IMDb IDs)
+    // This should complete within the timeout
+    const mdblistPromise = fetchMoviesFromMDBList().catch(err => {
+      console.error('mdblist fetch error:', err.message);
+      return [];
+    });
+    
+    const mdblistMovies = await withTimeout(mdblistPromise, REQUEST_TIMEOUT - 5000, []);
+    
+    // If we got MDBList movies, start processing them immediately
+    // while slower sources fetch in background
+    if (mdblistMovies.length > 0) {
+      console.log(`Got ${mdblistMovies.length} movies from MDBList (fast path)`);
+      
+      // Process MDBList movies immediately for quick response
+      const quickMetas = await processMoviesForCatalog(mdblistMovies, now);
+      
+      if (quickMetas.length > 0) {
+        // Update cache with quick results
+        catalogCache[cacheKey] = quickMetas;
+        cacheTimestamp[cacheKey] = now;
+        console.log(`Quick catalog ready with ${quickMetas.length} movies from MDBList`);
+        
+        // Start background fetch for additional sources (don't await)
+        fetchAdditionalSources(cacheKey).catch(err => {
+          console.error('Background fetch error:', err.message);
+        });
+        
+        movieFetchInProgress = false;
+        return returnFromCache(catalogCache[cacheKey]);
+      }
+    }
+    
+    // If MDBList failed or returned empty, try the full fetch with remaining timeout
+    console.log(`MDBList empty or slow, trying all sources...`);
+    const fetchPromise = (async () => {
+      // Fetch movies from all sources in parallel
+      const [rlsbbMovies, redditMovies, mdblistMovies2] = await Promise.all([
+        fetchMovies(500).catch(err => { console.error('rlsbb fetch error:', err.message); return []; }),
+        fetchMoviesFromReddit(100).catch(err => { console.error('reddit fetch error:', err.message); return []; }),
+        mdblistMovies.length > 0 ? Promise.resolve(mdblistMovies) : fetchMoviesFromMDBList().catch(err => { console.error('mdblist fetch error:', err.message); return []; })
+      ]);
+      
+      return { rlsbbMovies, redditMovies, mdblistMovies: mdblistMovies2 };
+    })();
+    
+    // Wait for fetch with timeout, return stale cache or empty if timeout
+    const result = await withTimeout(fetchPromise, 5000, null);
+    
+    if (!result) {
+      console.log(`⚠️ Fetch timed out after ${REQUEST_TIMEOUT}ms`);
+      movieFetchInProgress = false;
+      
+      // Return stale cache if available, otherwise empty
+      if (hasAnyCache) {
+        console.log(`Returning stale cache due to timeout`);
+        return returnFromCache(catalogCache[cacheKey]);
+      }
+      return { metas: [] };
+    }
+    
+    const { rlsbbMovies, redditMovies, mdblistMovies: allMdblistMovies } = result;
+    
+    console.log(`Fetched ${rlsbbMovies.length} from rlsbb.to, ${redditMovies.length} from r/movieleaks, ${allMdblistMovies.length} from MDBList`);
+    
+    // Merge all sources - prioritize MDBList (has IMDb IDs already)
+    const movies = [...allMdblistMovies, ...rlsbbMovies, ...redditMovies];
   
   // Remove duplicates based on IMDb ID (use slug as fallback)
   const uniqueMovies = [];
@@ -435,6 +665,7 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   // Update cache for this sort type
   catalogCache[cacheKey] = metas;
   cacheTimestamp[cacheKey] = now;
+  movieFetchInProgress = false;
 
   console.log(`Catalog updated with ${metas.length} movies total`);
   
@@ -469,6 +700,18 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   }
   
   return { metas: paginatedMetas };
+  
+  } catch (error) {
+    console.error(`Catalog fetch error:`, error.message);
+    movieFetchInProgress = false;
+    
+    // Return stale cache if available, otherwise empty
+    if (hasAnyCache) {
+      console.log(`Returning stale cache due to error`);
+      return returnFromCache(catalogCache[cacheKey]);
+    }
+    return { metas: [] };
+  }
 });
 
 /**
