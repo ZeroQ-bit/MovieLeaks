@@ -531,12 +531,8 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
     // This ensures we get data from all sources that respond in time
     const sourceTimeout = 20000; // 20 seconds per source
     
-    const [mdblistMovies, rlsbbMovies, redditMovies] = await Promise.all([
-      withTimeout(
-        fetchMoviesFromMDBList().catch(err => { console.error('mdblist fetch error:', err.message); return []; }),
-        sourceTimeout,
-        []
-      ),
+    // MDBList disabled - only using rlsbb and Reddit
+    const [rlsbbMovies, redditMovies] = await Promise.all([
       withTimeout(
         fetchMovies(200).catch(err => { console.error('rlsbb fetch error:', err.message); return []; }),
         sourceTimeout,
@@ -549,10 +545,10 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
       )
     ]);
     
-    console.log(`Fetched: MDBList=${mdblistMovies.length}, rlsbb=${rlsbbMovies.length}, Reddit=${redditMovies.length}`);
+    console.log(`Fetched: rlsbb=${rlsbbMovies.length}, Reddit=${redditMovies.length}`);
     
-    // Merge all sources - MDBList first (most reliable), then rlsbb, then reddit
-    const allMovies = [...mdblistMovies, ...rlsbbMovies, ...redditMovies];
+    // Merge sources - rlsbb first, then reddit
+    const allMovies = [...rlsbbMovies, ...redditMovies];
     
     if (allMovies.length === 0) {
       console.log(`No movies from any source`);
