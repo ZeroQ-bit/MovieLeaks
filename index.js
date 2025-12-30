@@ -527,180 +527,56 @@ builder.defineCatalogHandler(async ({ type, id, extra, config }) => {
   console.log(`Fetching fresh movie data...`);
   
   try {
-    // First, try to get MDBList (fastest source - already has IMDb IDs)
-    // This should complete within the timeout
-    const mdblistPromise = fetchMoviesFromMDBList().catch(err => {
-      console.error('mdblist fetch error:', err.message);
-      return [];
-    });
+    // Fetch ALL sources in parallel with individual timeouts
+    // This ensures we get data from all sources that respond in time
+    const sourceTimeout = 20000; // 20 seconds per source
     
-    const mdblistMovies = await withTimeout(mdblistPromise, REQUEST_TIMEOUT - 5000, []);
+    const [mdblistMovies, rlsbbMovies, redditMovies] = await Promise.all([
+      withTimeout(
+        fetchMoviesFromMDBList().catch(err => { console.error('mdblist fetch error:', err.message); return []; }),
+        sourceTimeout,
+        []
+      ),
+      withTimeout(
+        fetchMovies(200).catch(err => { console.error('rlsbb fetch error:', err.message); return []; }),
+        sourceTimeout,
+        []
+      ),
+      withTimeout(
+        fetchMoviesFromReddit(50).catch(err => { console.error('reddit fetch error:', err.message); return []; }),
+        sourceTimeout,
+        []
+      )
+    ]);
     
-    // If we got MDBList movies, start processing them immediately
-    // while slower sources fetch in background
-    if (mdblistMovies.length > 0) {
-      console.log(`Got ${mdblistMovies.length} movies from MDBList (fast path)`);
-      
-      // Process MDBList movies immediately for quick response
-      const quickMetas = await processMoviesForCatalog(mdblistMovies, now);
-      
-      if (quickMetas.length > 0) {
-        // Update cache with quick results
-        catalogCache[cacheKey] = quickMetas;
-        cacheTimestamp[cacheKey] = now;
-        console.log(`Quick catalog ready with ${quickMetas.length} movies from MDBList`);
-        
-        // Start background fetch for additional sources (don't await)
-        fetchAdditionalSources(cacheKey).catch(err => {
-          console.error('Background fetch error:', err.message);
-        });
-        
-        movieFetchInProgress = false;
-        return returnFromCache(catalogCache[cacheKey]);
-      }
-    }
+    console.log(`Fetched: MDBList=${mdblistMovies.length}, rlsbb=${rlsbbMovies.length}, Reddit=${redditMovies.length}`);
     
-    // If MDBList failed or returned empty, try the full fetch with remaining timeout
-    console.log(`MDBList empty or slow, trying all sources...`);
-    const fetchPromise = (async () => {
-      // Fetch movies from all sources in parallel
-      const [rlsbbMovies, redditMovies, mdblistMovies2] = await Promise.all([
-        fetchMovies(500).catch(err => { console.error('rlsbb fetch error:', err.message); return []; }),
-        fetchMoviesFromReddit(100).catch(err => { console.error('reddit fetch error:', err.message); return []; }),
-        mdblistMovies.length > 0 ? Promise.resolve(mdblistMovies) : fetchMoviesFromMDBList().catch(err => { console.error('mdblist fetch error:', err.message); return []; })
-      ]);
-      
-      return { rlsbbMovies, redditMovies, mdblistMovies: mdblistMovies2 };
-    })();
+    // Merge all sources - MDBList first (most reliable), then rlsbb, then reddit
+    const allMovies = [...mdblistMovies, ...rlsbbMovies, ...redditMovies];
     
-    // Wait for fetch with timeout, return stale cache or empty if timeout
-    const result = await withTimeout(fetchPromise, 5000, null);
-    
-    if (!result) {
-      console.log(`⚠️ Fetch timed out after ${REQUEST_TIMEOUT}ms`);
+    if (allMovies.length === 0) {
+      console.log(`No movies from any source`);
       movieFetchInProgress = false;
       
-      // Return stale cache if available, otherwise empty
       if (hasAnyCache) {
-        console.log(`Returning stale cache due to timeout`);
         return returnFromCache(catalogCache[cacheKey]);
       }
       return { metas: [] };
     }
     
-    const { rlsbbMovies, redditMovies, mdblistMovies: allMdblistMovies } = result;
+    // Process all movies
+    const metas = await processMoviesForCatalog(allMovies, now);
     
-    console.log(`Fetched ${rlsbbMovies.length} from rlsbb.to, ${redditMovies.length} from r/movieleaks, ${allMdblistMovies.length} from MDBList`);
+    if (metas.length > 0) {
+      // Update cache
+      catalogCache[cacheKey] = metas;
+      cacheTimestamp[cacheKey] = now;
+      console.log(`Catalog ready with ${metas.length} movies from all sources`);
+      
+      movieFetchInProgress = false;
+      return returnFromCache(catalogCache[cacheKey]);
+    }
     
-    // Merge all sources - prioritize MDBList (has IMDb IDs already)
-    const movies = [...allMdblistMovies, ...rlsbbMovies, ...redditMovies];
-  
-  // Remove duplicates based on IMDb ID (use slug as fallback)
-  const uniqueMovies = [];
-  const seenIds = new Set();
-  for (const movie of movies) {
-    const uniqueKey = movie.imdbId || movie.id;
-    if (!seenIds.has(uniqueKey)) {
-      seenIds.add(uniqueKey);
-      uniqueMovies.push(movie);
-    }
-  }
-  
-  console.log(`Fetched ${movies.length} posts, ${uniqueMovies.length} unique movies`);
-  
-  // Enrich with Cinemeta metadata
-  const metas = (await Promise.all(uniqueMovies.map(async (movie) => {
-    let cinemataData = null;
-
-    // Try to fetch from Cinemeta if we have an IMDb ID
-    if (movie.imdbId) {
-      try {
-        cinemataData = await getMovieByImdbId(movie.imdbId);
-      } catch (error) {
-        console.error(`Failed to fetch Cinemeta data for ${movie.imdbId}:`, error.message);
-      }
-    }
-
-    // Skip movies without IMDb ID (we need IMDb ID for Stremio)
-    if (!movie.imdbId || !movie.imdbId.startsWith('tt')) {
-      console.log(`Skipping movie without valid IMDb ID: ${movie.title} (ID: ${movie.imdbId})`);
-      return null;
-    }
-
-    // Build description
-    let description = cinemataData?.description || movie.description || 'HD movie release';
-
-    // Build meta object
-    const meta = {
-      id: movie.imdbId,
-      type: 'movie',
-      name: cinemataData?.name || movie.title,
-      releaseInfo: cinemataData?.releaseInfo || movie.year,
-      poster: cinemataData?.poster || movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster',
-      posterShape: 'poster',
-      background: cinemataData?.background,
-      logo: cinemataData?.logo,
-      description: description,
-      genres: Array.isArray(cinemataData?.genres) ? cinemataData.genres : [],
-      director: cinemataData?.director,
-      cast: Array.isArray(cinemataData?.cast) ? cinemataData.cast : [],
-      imdbRating: cinemataData?.imdbRating,
-      runtime: cinemataData?.runtime,
-      year: cinemataData?.year || movie.year,
-      links: []
-    };
-
-    // Add IMDb link if available
-    if (movie.imdbId) {
-      meta.links.push({
-        name: 'IMDb',
-        category: 'Metadata',
-        url: `https://www.imdb.com/title/${movie.imdbId}/`
-      });
-    }
-
-    return meta;
-  }))).filter(meta => meta !== null);
-
-  // Update cache for this sort type
-  catalogCache[cacheKey] = metas;
-  cacheTimestamp[cacheKey] = now;
-  movieFetchInProgress = false;
-
-  console.log(`Catalog updated with ${metas.length} movies total`);
-  
-  // Apply tier limits
-  const tierLimit = isSupporter ? metas.length : FREE_TIER_LIMIT;
-  const availableMetas = metas.slice(0, tierLimit);
-  
-  // Apply RPDB posters only if supporter with valid key
-  let finalMetas = availableMetas;
-  if (canUseRPDB) {
-    console.log(`Applying RPDB posters for supporter (user provided key)`);
-    finalMetas = availableMetas.map(meta => {
-      if (meta.id && meta.id.startsWith('tt')) {
-        const rpdbPoster = getRPDBPosterUrl(meta.id, rpdbApiKey);
-        if (rpdbPoster) {
-          return { ...meta, poster: rpdbPoster };
-        }
-      }
-      return meta;
-    });
-  }
-  
-  // Return paginated slice
-  const paginatedMetas = finalMetas.slice(skip, skip + PAGE_SIZE);
-  
-  console.log(`Returning page: skip=${skip}, count=${paginatedMetas.length}, tierLimit=${tierLimit} (${isSupporter ? 'Supporter' : 'Free'}, RPDB: ${canUseRPDB ? 'Enabled' : 'Disabled'})`);
-  
-  // If we have no more items to return, return empty array
-  // Otherwise Stremio will keep requesting
-  if (paginatedMetas.length === 0) {
-    console.log('No more items available');
-  }
-  
-  return { metas: paginatedMetas };
-  
   } catch (error) {
     console.error(`Catalog fetch error:`, error.message);
     movieFetchInProgress = false;
