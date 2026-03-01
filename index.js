@@ -213,6 +213,9 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
   
   console.log(`Fetched ${series.length} posts, ${uniqueSeries.length} unique series (quick metadata mode)`);
   
+  // Gray placeholder image as data URI (no external requests)
+  const placeholderPoster = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="450"%3E%3Crect fill="%23333" width="300" height="450"/%3E%3C/svg%3E';
+  
   // Create minimal metadata objects first - NO full Cinemeta fetching for all
   const metas = uniqueSeries
     .filter(show => show.imdbId && show.imdbId.startsWith('tt'))
@@ -221,7 +224,7 @@ async function handleSeriesCatalog({ skip, genre, isSupporter, canUseRPDB, rpdbA
       type: 'series',
       name: show.title,
       releaseInfo: `${show.year}–`,
-      poster: 'https://via.placeholder.com/300x450/2c2c2c/ffffff?text=Series',
+      poster: placeholderPoster,
       posterShape: 'poster',
       description: `${show.title} - New series from ${show.year}`,
       genres: ['Drama'],
@@ -306,6 +309,9 @@ async function processMoviesForCatalogQuick(movies, now) {
   
   console.log(`Processing ${uniqueMovies.length} unique movies (quick mode - minimal metadata)`);
   
+  // Gray placeholder image as data URI (no external requests)
+  const placeholderPoster = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="450"%3E%3Crect fill="%23333" width="300" height="450"/%3E%3C/svg%3E';
+  
   // Create minimal metadata objects - NO Cinemeta fetching yet
   const metas = uniqueMovies
     .filter(movie => movie.imdbId && movie.imdbId.startsWith('tt'))
@@ -314,7 +320,7 @@ async function processMoviesForCatalogQuick(movies, now) {
       type: 'movie',
       name: movie.title,
       releaseInfo: movie.year,
-      poster: movie.poster || movie.thumbnail || 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Poster',
+      poster: placeholderPoster,
       posterShape: 'poster',
       description: 'HD movie release available',
       genres: [],
@@ -339,6 +345,7 @@ async function enrichSeriesWithCinemeta(series) {
   // Process Cinemeta requests in batches to avoid overwhelming the API
   const batchSize = 50;
   let enrichedCount = 0;
+  let failedCount = 0;
   
   for (let i = 0; i < series.length; i += batchSize) {
     const batch = series.slice(i, i + batchSize);
@@ -352,8 +359,8 @@ async function enrichSeriesWithCinemeta(series) {
           // Update the series object with enriched data
           Object.assign(show, {
             name: cinemataData.name,
-            poster: cinemataData.poster,
-            background: cinemataData.background,
+            poster: cinemataData.poster || show.poster,
+            background: cinemataData.background || show.background,
             logo: cinemataData.logo,
             description: cinemataData.description,
             genres: cinemataData.genres || [],
@@ -365,16 +372,22 @@ async function enrichSeriesWithCinemeta(series) {
             releaseInfo: cinemataData.releaseInfo
           });
           enrichedCount++;
+          
+          if (cinemataData.poster) {
+            console.log(`✓ Got poster for ${show.id}`);
+          }
         }
       } catch (error) {
-        // Silently continue on error
+        failedCount++;
+        console.error(`Failed to enrich ${show.id}:`, error.message);
       }
     }));
     
-    console.log(`Series enrichment progress: ${Math.min(i + batchSize, series.length)}/${series.length}`);
+    const progress = Math.min(i + batchSize, series.length);
+    console.log(`Series enrichment progress: ${progress}/${series.length} (${enrichedCount} enriched, ${failedCount} errors)`);
   }
   
-  console.log(`Series Cinemeta enrichment complete: ${enrichedCount}/${series.length} series enriched`);
+  console.log(`Series Cinemeta enrichment complete: ${enrichedCount}/${series.length} series enriched (${failedCount} failed)`);
 }
 
 /**
@@ -387,6 +400,7 @@ async function enrichMoviesWithCinemeta(movies) {
   // Process Cinemeta requests in batches to avoid overwhelming the API
   const batchSize = 50;
   let enrichedCount = 0;
+  let failedCount = 0;
   
   for (let i = 0; i < movies.length; i += batchSize) {
     const batch = movies.slice(i, i + batchSize);
@@ -400,8 +414,8 @@ async function enrichMoviesWithCinemeta(movies) {
           // Update the movie object with enriched data
           Object.assign(movie, {
             name: cinemataData.name,
-            poster: cinemataData.poster,
-            background: cinemataData.background,
+            poster: cinemataData.poster || movie.poster,
+            background: cinemataData.background || movie.background,
             logo: cinemataData.logo,
             description: cinemataData.description,
             genres: cinemataData.genres || [],
@@ -411,16 +425,22 @@ async function enrichMoviesWithCinemeta(movies) {
             runtime: cinemataData.runtime
           });
           enrichedCount++;
+          
+          if (cinemataData.poster) {
+            console.log(`✓ Got poster for ${movie.id}`);
+          }
         }
       } catch (error) {
-        // Silently continue on error
+        failedCount++;
+        console.error(`Failed to enrich ${movie.id}:`, error.message);
       }
     }));
     
-    console.log(`Cinemeta enrichment progress: ${Math.min(i + batchSize, movies.length)}/${movies.length}`);
+    const progress = Math.min(i + batchSize, movies.length);
+    console.log(`Cinemeta enrichment progress: ${progress}/${movies.length} (${enrichedCount} enriched, ${failedCount} errors)`);
   }
   
-  console.log(`Cinemeta enrichment complete: ${enrichedCount}/${movies.length} movies enriched`);
+  console.log(`Cinemeta enrichment complete: ${enrichedCount}/${movies.length} movies enriched (${failedCount} failed)`);
 }
 
 /**
