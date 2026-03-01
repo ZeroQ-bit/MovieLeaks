@@ -2,14 +2,27 @@ import fetch from 'node-fetch';
 
 const CINEMETA_BASE_URL = 'https://v3-cinemeta.strem.io';
 
+// Cache for Cinemeta responses to avoid redundant requests
+const cinemataCache = new Map();
+const CINEMETA_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
 /**
- * Fetches movie metadata from Cinemeta by IMDb ID
+ * Fetches movie metadata from Cinemeta by IMDb ID with caching
  * @param {string} imdbId - IMDb ID (e.g., tt1234567)
  * @returns {Promise<Object|null>} Movie metadata or null
  */
 export async function getMovieByImdbId(imdbId) {
   if (!imdbId || !imdbId.startsWith('tt')) {
     return null;
+  }
+
+  // Check cache first
+  const cacheKey = `movie-${imdbId}`;
+  if (cinemataCache.has(cacheKey)) {
+    const cached = cinemataCache.get(cacheKey);
+    if (Date.now() - cached.timestamp < CINEMETA_CACHE_TTL) {
+      return cached.data;
+    }
   }
 
   try {
@@ -27,7 +40,7 @@ export async function getMovieByImdbId(imdbId) {
       return null;
     }
 
-    return {
+    const result = {
       name: meta.name,
       poster: meta.poster,
       background: meta.background,
@@ -43,6 +56,10 @@ export async function getMovieByImdbId(imdbId) {
       country: meta.country,
       awards: meta.awards
     };
+
+    // Cache the result
+    cinemataCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
   } catch (error) {
     console.error('Error fetching from Cinemeta:', error);
     return null;
@@ -50,13 +67,22 @@ export async function getMovieByImdbId(imdbId) {
 }
 
 /**
- * Fetches series metadata from Cinemeta by IMDb ID
+ * Fetches series metadata from Cinemeta by IMDb ID with caching
  * @param {string} imdbId - IMDb ID (e.g., tt1234567)
  * @returns {Promise<Object|null>} Series metadata or null
  */
 export async function getSeriesByImdbId(imdbId) {
   if (!imdbId || !imdbId.startsWith('tt')) {
     return null;
+  }
+
+  // Check cache first
+  const cacheKey = `series-${imdbId}`;
+  if (cinemataCache.has(cacheKey)) {
+    const cached = cinemataCache.get(cacheKey);
+    if (Date.now() - cached.timestamp < CINEMETA_CACHE_TTL) {
+      return cached.data;
+    }
   }
 
   try {
@@ -90,7 +116,7 @@ export async function getSeriesByImdbId(imdbId) {
 
     seasonMap.forEach(value => seasons.push(value));
 
-    return {
+    const result = {
       name: meta.name,
       poster: meta.poster,
       background: meta.background,
@@ -109,6 +135,10 @@ export async function getSeriesByImdbId(imdbId) {
       videos: videos,
       seasons: seasons
     };
+
+    // Cache the result
+    cinemataCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
   } catch (error) {
     console.error('Error fetching series from Cinemeta:', error);
     return null;

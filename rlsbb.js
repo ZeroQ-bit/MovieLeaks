@@ -1,25 +1,46 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
+// In-memory cache for IMDB IDs (survives across requests)
+const imdbIdCache = new Map();
+
 /**
- * Fetches IMDB ID from a movie detail page
+ * Fetches IMDB ID from a movie detail page with timeout
  */
 async function fetchImdbId(movieUrl) {
+  // Check cache first
+  if (imdbIdCache.has(movieUrl)) {
+    return imdbIdCache.get(movieUrl);
+  }
+
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout per URL
+    
     const response = await fetch(movieUrl, {
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0',
         'Accept': 'text/html'
       }
     });
 
-    if (!response.ok) return null;
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      imdbIdCache.set(movieUrl, null);
+      return null;
+    }
 
     const html = await response.text();
     const imdbMatch = html.match(/imdb\.com\/title\/(tt\d+)/);
-    return imdbMatch ? imdbMatch[1] : null;
+    const imdbId = imdbMatch ? imdbMatch[1] : null;
+    
+    imdbIdCache.set(movieUrl, imdbId);
+    return imdbId;
   } catch (error) {
     console.error(`Failed to fetch IMDB ID from ${movieUrl}:`, error.message);
+    imdbIdCache.set(movieUrl, null);
     return null;
   }
 }
@@ -151,9 +172,9 @@ export async function fetchMovies(limit = 300) {
     
     console.log(`Found ${movieLinks.length} total movies, fetching IMDB IDs...`);
     
-    // Second pass: fetch IMDB IDs in parallel batches
+    // Second pass: fetch IMDB IDs in parallel batches (larger batches for faster processing)
     const limitedMovies = movieLinks.slice(0, limit);
-    const batchSize = 10;
+    const batchSize = 30; // Increased from 10 to 30 for faster parallel processing
     const movies = [];
     
     for (let i = 0; i < limitedMovies.length; i += batchSize) {
@@ -170,11 +191,17 @@ export async function fetchMovies(limit = 300) {
         })
       );
       movies.push(...results);
-      console.log(`Fetched ${movies.length}/${limitedMovies.length} movies...`);
+      
+      // Log progress less frequently to reduce overhead
+      if ((i / batchSize) % 2 === 0) {
+        console.log(`Fetched ${movies.length}/${limitedMovies.length} movies...`);
+      }
     }
     
-    console.log(`Fetched ${movies.length} movies with IMDB IDs`);
-    return movies;
+    // Filter out movies without IMDB IDs early to reduce downstream processing
+    const moviesWithIds = movies.filter(m => m.imdbId);
+    console.log(`Fetched ${moviesWithIds.length}/${movies.length} movies with IMDB IDs`);
+    return moviesWithIds;
     
   } catch (error) {
     console.error('rlsbb.to error:', error.message);
